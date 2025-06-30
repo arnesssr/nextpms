@@ -25,6 +25,7 @@ interface ProductModuleTabsProps {
   onEditProduct?: (product: Product) => void;
   onViewProduct?: (product: Product) => void;
   onDeleteProduct?: (productId: string) => void;
+  onDuplicateProduct?: (product: Product) => void;
 }
 
 const productModules = [
@@ -64,7 +65,8 @@ export const ProductModuleTabs: React.FC<ProductModuleTabsProps> = ({
   onCreateProduct,
   onEditProduct,
   onViewProduct,
-  onDeleteProduct
+  onDeleteProduct,
+  onDuplicateProduct
 }) => {
   const [activeTab, setActiveTab] = useState('catalog');
 
@@ -77,6 +79,7 @@ export const ProductModuleTabs: React.FC<ProductModuleTabsProps> = ({
             onEditProduct={onEditProduct}
             onViewProduct={onViewProduct}
             onDeleteProduct={onDeleteProduct}
+            onDuplicateProduct={onDuplicateProduct}
           />
         );
       

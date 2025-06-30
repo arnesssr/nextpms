@@ -26,11 +26,15 @@ export async function GET(request: NextRequest) {
 
     // Use the get_products_with_categories function for efficient querying
     const { data, error } = await supabase.rpc('get_products_with_categories', {
-      p_limit: filters.limit,
+      p_limit: filters.limit || 20,
       p_offset: ((filters.page || 1) - 1) * (filters.limit || 20),
       p_category_id: filters.category_id || null,
       p_status: filters.status || null,
       p_search: filters.search || null,
+      p_sort_by: filters.sort_by || 'created_at',
+      p_sort_order: filters.sort_order || 'desc',
+      p_featured_only: filters.is_featured || false,
+      p_include_inactive: true // Include all products for admin view
     });
 
     if (error) {
@@ -41,46 +45,16 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Get total count for pagination
-    let countQuery = supabase
-      .from('products')
-      .select('*', { count: 'exact', head: true });
-
-    // Apply same filters for count
-    if (filters.category_id) {
-      countQuery = countQuery.eq('category_id', filters.category_id);
-    }
-    if (filters.status) {
-      countQuery = countQuery.eq('status', filters.status);
-    }
-    if (filters.search) {
-      countQuery = countQuery.or(`name.ilike.%${filters.search}%,description.ilike.%${filters.search}%,sku.ilike.%${filters.search}%`);
-    }
-    if (filters.is_active !== undefined) {
-      countQuery = countQuery.eq('is_active', filters.is_active);
-    }
-    if (filters.is_featured !== undefined) {
-      countQuery = countQuery.eq('is_featured', filters.is_featured);
-    }
-    if (filters.min_price !== undefined) {
-      countQuery = countQuery.gte('selling_price', filters.min_price);
-    }
-    if (filters.max_price !== undefined) {
-      countQuery = countQuery.lte('selling_price', filters.max_price);
-    }
-    if (filters.in_stock) {
-      countQuery = countQuery.gt('stock_quantity', 0);
-    }
-
-    const { count } = await countQuery;
+    // Extract total count from the first row (all rows have same total_count)
+    const totalCount = data && data.length > 0 ? data[0].total_count : 0;
 
     return NextResponse.json({
       success: true,
       data: data || [],
-      total: count || 0,
+      total: totalCount || 0,
       page: filters.page || 1,
       limit: filters.limit || 20,
-      total_pages: Math.ceil((count || 0) / (filters.limit || 20))
+      total_pages: Math.ceil((totalCount || 0) / (filters.limit || 20))
     });
     
   } catch (error) {

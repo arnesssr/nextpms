@@ -1,9 +1,35 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
-## Getting Started
 
-First, run the development server:
+A modern, modular Property Management System (PMS) frontend application built with Next.js 15, React 19, and TypeScript. This project follows a clean, modular architecture designed for scalability, maintainability, and ease of development.
 
+## 🚀 Quick Start
+
+### Prerequisites
+
+- Node.js 18.0 or later
+- npm, yarn, pnpm, or bun package manager
+- Git for version control
+
+### Development Setup
+
+1. Clone the repository:
+```bash
+git clone <repository-url>
+cd frontend-pms
+```
+
+2. Install dependencies:
+```bash
+npm install
+# or
+yarn install
+# or
+pnpm install
+# or
+bun install
+```
+
+3. Start the development server:
 ```bash
 npm run dev
 # or
@@ -14,24 +40,124 @@ pnpm dev
 bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+4. Open [http://localhost:3000](http://localhost:3000) in your browser to see the application.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## 📁 Project Structure
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```
+frontend-pms/
+├── src/                    # Source code
+│   ├── app/               # Next.js App Router pages
+│   ├── components/        # Reusable UI components
+│   ├── modules/           # Feature modules
+│   ├── lib/              # Utility libraries
+│   └── types/            # TypeScript type definitions
+├── docs/                  # Project documentation
+│   ├── architecture/     # System architecture docs
+│   ├── guides/           # Development guides
+│   ├── examples/         # Code examples
+│   ├── api/              # API documentation
+│   ├── README.md         # Documentation overview
+│   └── TOOLS.md          # Tools and technologies
+├── public/               # Static assets
+├── CONTRIBUTING.md       # Contribution guidelines
+├── CHANGELOG.md          # Project changelog
+└── LICENSE               # MIT License
+```
 
-## Learn More
+## 🏗️ Architecture
 
-To learn more about Next.js, take a look at the following resources:
+This project implements a **modular architecture** where features are organized into self-contained modules. Each module encapsulates its own components, utilities, types, and logic, promoting:
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+- **Separation of Concerns**: Clear boundaries between different features
+- **Reusability**: Components and utilities can be shared across modules
+- **Scalability**: Easy to add new features without affecting existing code
+- **Maintainability**: Isolated modules are easier to test and debug
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+For detailed architecture information, see [docs/architecture/](./docs/architecture/).
 
-## Deploy on Vercel
+## 📚 Documentation
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+Comprehensive documentation is available in the `docs/` directory:
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
-# nextpms
+- **[Architecture Overview](./docs/architecture/README.md)** - System design and patterns
+- **[Development Guides](./docs/guides/README.md)** - How-to guides for developers
+- **[API Documentation](./docs/api/README.md)** - API specifications and examples
+- **[Tools & Technologies](./docs/TOOLS.md)** - Tech stack and development tools
+
+### Key Documentation Files
+
+- [Module Definitions](./docs/architecture/module-definitions.md) - Understanding the module system
+- [Creating Modules Guide](./docs/guides/creating-modules.md) - Step-by-step module creation
+- [Product Module Example](./docs/examples/product-module.md) - Complete module implementation example
+- [System Flow](./docs/architecture/system-flow.md) - Data flow and system interactions
+
+## 🛠️ Technology Stack
+
+### Frontend
+- **Next.js 15** - React framework with App Router
+- **React 19** - UI library with latest features
+- **TypeScript** - Type-safe JavaScript
+- **Tailwind CSS** - Utility-first CSS framework
+- **Shadcn/ui** - Modern component library
+
+### Development Tools
+- **ESLint** - Code linting
+- **Prettier** - Code formatting
+- **Husky** - Git hooks
+- **Jest** - Testing framework
+- **Storybook** - Component development
+
+For a complete list of tools and technologies, see [TOOLS.md](./docs/TOOLS.md).
+
+## 🤝 Contributing
+
+We welcome contributions! Please read our [Contributing Guidelines](./CONTRIBUTING.md) before submitting pull requests.
+
+### Development Workflow
+
+1. Fork the repository
+2. Create a feature branch: `git checkout -b feature/your-feature-name`
+3. Make your changes following our coding standards
+4. Write or update tests as needed
+5. Update documentation if required
+6. Submit a pull request
+
+## 📋 Available Scripts
+
+```bash
+npm run dev          # Start development server
+npm run build        # Build for production
+npm run start        # Start production server
+npm run lint         # Run ESLint
+npm run lint:fix     # Fix ESLint issues
+npm run test         # Run tests
+npm run test:watch   # Run tests in watch mode
+npm run type-check   # Check TypeScript types
+```
+
+## 🔧 Configuration
+
+The project includes configuration files for:
+
+- **TypeScript** (`tsconfig.json`) - TypeScript compiler options
+- **ESLint** (`.eslintrc.json`) - Code linting rules
+- **Prettier** (`.prettierrc`) - Code formatting rules
+- **Tailwind CSS** (`tailwind.config.js`) - CSS framework configuration
+- **Next.js** (`next.config.js`) - Framework configuration
+
+## 📄 License
+
+This project is licensed under the MIT License. See the [LICENSE](./LICENSE) file for details.
+
+## 📞 Support
+
+For questions, issues, or contributions:
+
+- Create an issue in the repository
+- Follow the contributing guidelines
+- Check existing documentation in the `docs/` directory
+
+---
+
+**Note**: This project is in active development. Features and documentation are continuously being improved. Check the [CHANGELOG.md](./CHANGELOG.md) for recent updates.

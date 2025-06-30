@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Product } from '../../../types/product-types';
-import { productService } from '@/services/products';
+import { ProductService as productService } from '@/services/products';
 
 interface UseProductsState {
   products: Product[];
@@ -26,8 +26,8 @@ export const useProducts = (): UseProductsState & UseProductsActions => {
     setLoading(true);
     setError(null);
     try {
-      const data = await productService.getProducts();
-      setProducts(data);
+      const response = await productService.getProducts();
+      setProducts(response.data || []);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch products');
     } finally {

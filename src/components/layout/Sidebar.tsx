@@ -24,32 +24,35 @@ import {
   useSidebar,
 } from '@/components/ui/sidebar';
 import { 
-  Package, 
-  ShoppingCart, 
-  BarChart3, 
-  Settings, 
   Bell,
   Search,
-  User,
-  Boxes,
-  Truck,
-  Home,
-  FolderTree
 } from 'lucide-react';
+import {
+  PmsLogo,
+  DashboardIcon,
+  ProductsIcon,
+  CategoriesIcon,
+  OrdersIcon,
+  InventoryIcon,
+  SuppliersIcon,
+  AnalyticsIcon,
+  SettingsIcon,
+  ProfileIcon,
+} from '@/components/icons';
 
 interface SidebarLayoutProps {
   children: ReactNode;
 }
 
 const navigationItems = [
-  { icon: Home, label: 'Dashboard', href: '/' },
-  { icon: Package, label: 'Products', href: '/products' },
-  { icon: FolderTree, label: 'Categories', href: '/categories' },
-  { icon: ShoppingCart, label: 'Orders', href: '/orders' },
-  { icon: Boxes, label: 'Inventory', href: '/inventory' },
-  { icon: Truck, label: 'Suppliers', href: '/suppliers' },
-  { icon: BarChart3, label: 'Analytics', href: '/analytics' },
-  { icon: Settings, label: 'Settings', href: '/settings' },
+  { icon: DashboardIcon, label: 'Dashboard', href: '/' },
+  { icon: ProductsIcon, label: 'Products', href: '/products' },
+  { icon: CategoriesIcon, label: 'Categories', href: '/categories' },
+  { icon: OrdersIcon, label: 'Orders', href: '/orders' },
+  { icon: InventoryIcon, label: 'Inventory', href: '/inventory' },
+  { icon: SuppliersIcon, label: 'Suppliers', href: '/suppliers' },
+  { icon: AnalyticsIcon, label: 'Analytics', href: '/analytics' },
+  { icon: SettingsIcon, label: 'Settings', href: '/settings' },
 ];
 
 function AppSidebar() {
@@ -59,7 +62,7 @@ function AppSidebar() {
     <Sidebar variant="inset">
       <SidebarHeader>
         <div className="flex items-center space-x-2 px-2 py-1">
-          <Package className="h-6 w-6" />
+          <img src="/pms-logo.svg" alt="PMS Logo" className="h-6 w-6" />
           <span className="font-bold text-lg">PMS</span>
         </div>
       </SidebarHeader>
@@ -92,7 +95,7 @@ function AppSidebar() {
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton>
-              <User className="h-4 w-4" />
+              <ProfileIcon className="h-4 w-4" />
               <span>Profile</span>
             </SidebarMenuButton>
           </SidebarMenuItem>
@@ -138,7 +141,7 @@ export function SidebarLayout({ children }: SidebarLayoutProps) {
             
             {/* User Profile */}
             <Button variant="ghost" size="sm">
-              <User className="h-4 w-4" />
+              <ProfileIcon className="h-4 w-4" />
             </Button>
           </div>
         </header>

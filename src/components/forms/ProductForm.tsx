@@ -23,7 +23,7 @@ import {
 } from 'lucide-react';
 import { Product } from '@/types';
 import { useCategories } from '@/app/categories/category-modules/category-management/hooks/useCategories';
-import { productService } from '@/services/products/productService';
+import { ProductService as productService } from '@/services/products';
 
 // Form validation schema
 const productSchema = z.object({
@@ -34,9 +34,19 @@ const productSchema = z.object({
   category_id: z.string().min(1, 'Category is required'),
   sku: z.string().optional(),
   stock_quantity: z.number().min(0, 'Stock cannot be negative'),
+  status: z.enum(['draft', 'published', 'archived']).default('draft'),
 });
 
-type ProductFormData = z.infer<typeof productSchema>;
+type ProductFormData = {
+  name: string;
+  description: string;
+  base_price: number;
+  selling_price: number;
+  category_id: string;
+  sku?: string;
+  stock_quantity: number;
+  status: 'draft' | 'published' | 'archived';
+};
 
 interface ProductFormProps {
   product?: Product | null;
@@ -61,12 +71,13 @@ export function ProductForm({ product, onClose, onSuccess }: ProductFormProps) {
     resolver: zodResolver(productSchema),
     defaultValues: product ? {
       name: product.name,
-      description: product.description,
-      base_price: product.base_price,
-      selling_price: product.selling_price,
-      category_id: product.category_id,
+      description: product.description || '',
+      base_price: product.base_price || 0,
+      selling_price: product.selling_price || 0,
+      category_id: product.category_id || '',
       sku: product.sku || '',
-      stock_quantity: product.stock_quantity,
+      stock_quantity: product.stock_quantity || 0,
+      status: product.status || 'draft' as const,
     } : {
       name: '',
       description: '',
@@ -75,6 +86,7 @@ export function ProductForm({ product, onClose, onSuccess }: ProductFormProps) {
       category_id: '',
       sku: '',
       stock_quantity: 0,
+      status: 'draft' as const,
     }
   });
 
@@ -107,15 +119,29 @@ export function ProductForm({ product, onClose, onSuccess }: ProductFormProps) {
     setImages(prev => prev.filter((_, i) => i !== index));
   };
 
-  const onSubmit = async (data: ProductFormData) => {
+  const onSubmit = async (data: ProductFormData, isDraft = false) => {
     setIsSubmitting(true);
     try {
       const productData = {
-        ...data,
-        images,
+        name: data.name,
+        description: data.description,
+        category_id: data.category_id,
+        sku: data.sku || '',
+        base_price: data.base_price,
+        selling_price: data.selling_price,
+        stock_quantity: data.stock_quantity,
+        status: isDraft ? 'draft' : data.status || 'published',
+        is_active: true,
+        is_featured: false,
+        is_digital: false,
+        track_inventory: true,
+        requires_shipping: true,
+        min_stock_level: 0,
+        discount_percentage: 0,
+        tax_rate: 0,
       };
       
-      let result: Product;
+      let result;
       
       if (product?.id) {
         // Update existing product
@@ -125,8 +151,12 @@ export function ProductForm({ product, onClose, onSuccess }: ProductFormProps) {
         result = await productService.createProduct(productData);
       }
       
-      onSuccess?.(result);
-      onClose();
+      if (result.success) {
+        onSuccess?.(result.data);
+        onClose();
+      } else {
+        throw new Error(result.error || 'Failed to save product');
+      }
     } catch (error) {
       console.error('Error saving product:', error);
       // TODO: Show error toast/message to user
@@ -297,6 +327,42 @@ export function ProductForm({ product, onClose, onSuccess }: ProductFormProps) {
           </CardContent>
         </Card>
 
+        {/* Product Status */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center">
+              <Tag className="mr-2 h-5 w-5" />
+              Product Status
+            </CardTitle>
+            <CardDescription>
+              Set the publication status of your product
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="status">Status *</Label>
+              <Select 
+                value={watchedValues.status} 
+                onValueChange={(value: 'draft' | 'published' | 'archived') => setValue('status', value)}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="draft">Draft</SelectItem>
+                  <SelectItem value="published">Published</SelectItem>
+                  <SelectItem value="archived">Archived</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-sm text-muted-foreground">
+                {watchedValues.status === 'draft' && "Product is saved as draft and not visible to customers"}
+                {watchedValues.status === 'published' && "Product is live and visible to customers"}
+                {watchedValues.status === 'archived' && "Product is archived and not visible to customers"}
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+
         {/* Images */}
         <Card>
           <CardHeader>
@@ -365,13 +431,26 @@ export function ProductForm({ product, onClose, onSuccess }: ProductFormProps) {
             Cancel
           </Button>
           <div className="flex space-x-2">
-            {product?.status === 'draft' && (
-              <Button type="button" variant="outline" disabled={isSubmitting}>
-                Save as Draft
-              </Button>
-            )}
-            <Button type="submit" disabled={isSubmitting || !isDirty}>
-              {isSubmitting ? 'Saving...' : product ? 'Update Product' : 'Create Product'}
+            <Button 
+              type="button" 
+              variant="outline" 
+              disabled={isSubmitting}
+              onClick={() => {
+                setValue('status', 'draft');
+                handleSubmit((data) => onSubmit(data, true))();
+              }}
+            >
+              Save as Draft
+            </Button>
+            <Button 
+              type="button" 
+              disabled={isSubmitting || !isDirty}
+              onClick={() => {
+                setValue('status', 'published');
+                handleSubmit((data) => onSubmit(data, false))();
+              }}
+            >
+              {isSubmitting ? 'Publishing...' : product ? 'Update & Publish' : 'Publish Product'}
             </Button>
           </div>
         </div>

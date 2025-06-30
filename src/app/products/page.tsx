@@ -27,12 +27,79 @@ export default function ProductsPage() {
   };
 
   const handleCreateProduct = () => {
-    router.push('/products/create');
+    router.push('/products/product-modules/product-create');
   };
 
   const handleViewProduct = (product: Product) => {
-    // Handle product view logic
-    console.log('Viewing product:', product);
+    console.log('🔍 View Details handled by ProductCatalogList modal');
+    // This is now handled by the ProductDetailModal in ProductCatalogList
+    // No navigation needed - modal opens instead
+  };
+
+  const handleDeleteProduct = async (productId: string) => {
+    const product = products.find(p => p.id === productId);
+    const productName = product?.name || 'this product';
+    
+    if (window.confirm(`Are you sure you want to delete "${productName}"? This action cannot be undone.`)) {
+      try {
+        // Import the product service
+        const { ProductService } = await import('@/services/products');
+        await ProductService.deleteProduct(productId);
+        
+        // Refresh the page or update the products list
+        window.location.reload();
+      } catch (error) {
+        console.error('Failed to delete product:', error);
+        alert('Failed to delete product. Please try again.');
+      }
+    }
+  };
+
+  const handleDuplicateProduct = async (product: Product) => {
+    console.log('📋 Duplicate clicked for product:', product.name, 'ID:', product.id);
+    
+    try {
+      // Import the product service
+      const { ProductService } = await import('@/services/products');
+      
+      console.log('🔄 Creating duplicate product...');
+      
+      // Create a duplicate with modified name and SKU
+      const duplicateData = {
+        name: `${product.name} (Copy)`,
+        description: product.description || '',
+        category_id: product.category_id,
+        base_price: product.base_price || product.selling_price || 0,
+        selling_price: product.selling_price || 0,
+        stock_quantity: 0, // Start with 0 stock for duplicate
+        status: 'draft', // Always create duplicates as draft
+        is_active: true,
+        is_featured: false,
+        is_digital: false,
+        track_inventory: true,
+        requires_shipping: true,
+        min_stock_level: product.min_stock_level || 0,
+        discount_percentage: 0,
+        tax_rate: 0,
+      };
+      
+      console.log('📤 Sending duplicate data:', duplicateData);
+      
+      const result = await ProductService.createProduct(duplicateData);
+      
+      console.log('📥 Duplicate result:', result);
+      
+      if (result.success) {
+        // Navigate to edit the new duplicate
+        console.log('✅ Duplicate created, navigating to edit...');
+        router.push(`/products/create?duplicate=${result.data.id}`);
+      } else {
+        throw new Error(result.error || 'Failed to duplicate product');
+      }
+    } catch (error) {
+      console.error('❌ Failed to duplicate product:', error);
+      alert('Failed to duplicate product. Please try again.');
+    }
   };
 
   const handleFormClose = () => {
@@ -61,7 +128,7 @@ export default function ProductsPage() {
                 <Download className="mr-2 h-4 w-4" />
                 Export
               </Button>
-              <Button onClick={() => router.push('/products/create')}>
+              <Button onClick={() => router.push('/products/product-modules/product-create')}>
                 <Plus className="mr-2 h-4 w-4" />
                 Add Product
               </Button>
@@ -90,7 +157,8 @@ export default function ProductsPage() {
             onCreateProduct={handleCreateProduct}
             onEditProduct={handleEditProduct}
             onViewProduct={handleViewProduct}
-            onDeleteProduct={(id) => console.log('Delete product:', id)}
+            onDeleteProduct={handleDeleteProduct}
+            onDuplicateProduct={handleDuplicateProduct}
           />
         </div>
       </div>
