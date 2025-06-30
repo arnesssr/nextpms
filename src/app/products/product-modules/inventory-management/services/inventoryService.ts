@@ -4,30 +4,26 @@ import {
   LowStockAlert,
   LowStockReport
 } from '../types';
-
-// Mock API base URL - replace with actual API
-const API_BASE = '/api/inventory';
+import { supabase } from '@/lib/supabaseClient';
 
 export const inventoryService = {
   // Get inventory for a specific product
   async getProductInventory(productId: string): Promise<InventoryItem | null> {
     try {
-      // Mock implementation - replace with actual API call
-      const mockInventory: InventoryItem = {
-        id: '1',
-        product_id: productId,
-        quantity: 150,
-        reserved_quantity: 25,
-        low_stock_threshold: 50,
-        location: 'Warehouse A',
-        is_active: true,
-        created_at: '2024-01-01T00:00:00Z',
-        updated_at: '2024-01-15T10:30:00Z'
-      };
+      const { data, error } = await supabase
+        .from('inventory')
+        .select('*')
+        .eq('product_id', productId)
+        .single();
 
-      // Simulate API delay
-      await new Promise(resolve => setTimeout(resolve, 500));
-      return mockInventory;
+      if (error) {
+        if (error.code === 'PGRST116') {
+          return null; // No inventory found
+        }
+        throw error;
+      }
+
+      return data;
     } catch (error) {
       console.error('Error fetching product inventory:', error);
       throw new Error('Failed to fetch product inventory');
@@ -37,57 +33,17 @@ export const inventoryService = {
   // Get inventory for all products
   async getAllInventory(): Promise<InventoryItem[]> {
     try {
-      // Mock implementation - replace with actual API call
-      const mockInventoryItems: InventoryItem[] = [
-        {
-          id: '1',
-          product_id: '1',
-          quantity: 150,
-          reserved_quantity: 25,
-          low_stock_threshold: 50,
-          location: 'Warehouse A',
-          is_active: true,
-          created_at: '2024-01-01T00:00:00Z',
-          updated_at: '2024-01-15T10:30:00Z'
-        },
-        {
-          id: '2',
-          product_id: '2',
-          quantity: 30,
-          reserved_quantity: 10,
-          low_stock_threshold: 40,
-          location: 'Warehouse B',
-          is_active: true,
-          created_at: '2024-01-01T00:00:00Z',
-          updated_at: '2024-01-14T15:45:00Z'
-        },
-        {
-          id: '3',
-          product_id: '3',
-          quantity: 75,
-          reserved_quantity: 5,
-          low_stock_threshold: 20,
-          location: 'Warehouse A',
-          is_active: true,
-          created_at: '2024-01-01T00:00:00Z',
-          updated_at: '2024-01-16T09:20:00Z'
-        },
-        {
-          id: '4',
-          product_id: '4',
-          quantity: 5,
-          reserved_quantity: 0,
-          low_stock_threshold: 15,
-          location: 'Warehouse C',
-          is_active: true,
-          created_at: '2024-01-01T00:00:00Z',
-          updated_at: '2024-01-13T11:10:00Z'
-        }
-      ];
+      const { data, error } = await supabase
+        .from('inventory')
+        .select('*')
+        .eq('is_active', true)
+        .order('updated_at', { ascending: false });
 
-      // Simulate API delay
-      await new Promise(resolve => setTimeout(resolve, 800));
-      return mockInventoryItems;
+      if (error) {
+        throw error;
+      }
+
+      return data || [];
     } catch (error) {
       console.error('Error fetching all inventory:', error);
       throw new Error('Failed to fetch inventory');
@@ -103,20 +59,7 @@ export const inventoryService = {
         throw new Error(validation.errors.join(', '));
       }
 
-      // Mock implementation - replace with actual API call
-      const response = await fetch(`${API_BASE}/adjust`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(request),
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to adjust stock');
-      }
-
-      // Return mock updated inventory
+      // Get current inventory
       const currentInventory = await this.getProductInventory(request.product_id);
       if (!currentInventory) {
         throw new Error('Product inventory not found');
@@ -126,13 +69,24 @@ export const inventoryService = {
         ? request.adjustment_quantity 
         : -request.adjustment_quantity;
 
-      const updatedInventory: InventoryItem = {
-        ...currentInventory,
-        quantity: Math.max(0, currentInventory.quantity + adjustmentAmount),
-        updated_at: new Date().toISOString()
-      };
+      const newQuantity = Math.max(0, currentInventory.quantity + adjustmentAmount);
 
-      return updatedInventory;
+      // Update inventory in Supabase
+      const { data, error } = await supabase
+        .from('inventory')
+        .update({ 
+          quantity: newQuantity,
+          updated_at: new Date().toISOString()
+        })
+        .eq('product_id', request.product_id)
+        .select()
+        .single();
+
+      if (error) {
+        throw error;
+      }
+
+      return data;
     } catch (error) {
       console.error('Error adjusting stock:', error);
       throw new Error('Failed to adjust stock');
@@ -173,21 +127,21 @@ export const inventoryService = {
         throw new Error('Threshold cannot be negative');
       }
 
-      // Mock implementation - replace with actual API call
-      const currentInventory = await this.getProductInventory(productId);
-      if (!currentInventory) {
-        throw new Error('Product inventory not found');
+      const { data, error } = await supabase
+        .from('inventory')
+        .update({ 
+          low_stock_threshold: threshold,
+          updated_at: new Date().toISOString()
+        })
+        .eq('product_id', productId)
+        .select()
+        .single();
+
+      if (error) {
+        throw error;
       }
 
-      const updatedInventory: InventoryItem = {
-        ...currentInventory,
-        low_stock_threshold: threshold,
-        updated_at: new Date().toISOString()
-      };
-
-      // Simulate API delay
-      await new Promise(resolve => setTimeout(resolve, 300));
-      return updatedInventory;
+      return data;
     } catch (error) {
       console.error('Error updating low stock threshold:', error);
       throw new Error('Failed to update low stock threshold');
@@ -235,15 +189,21 @@ export const inventoryService = {
         throw new Error('Insufficient stock available for reservation');
       }
 
-      const updatedInventory: InventoryItem = {
-        ...currentInventory,
-        reserved_quantity: currentInventory.reserved_quantity + quantity,
-        updated_at: new Date().toISOString()
-      };
+      const { data, error } = await supabase
+        .from('inventory')
+        .update({ 
+          reserved_quantity: currentInventory.reserved_quantity + quantity,
+          updated_at: new Date().toISOString()
+        })
+        .eq('product_id', productId)
+        .select()
+        .single();
 
-      // Simulate API delay
-      await new Promise(resolve => setTimeout(resolve, 400));
-      return updatedInventory;
+      if (error) {
+        throw error;
+      }
+
+      return data;
     } catch (error) {
       console.error('Error reserving stock:', error);
       throw new Error('Failed to reserve stock');
@@ -262,15 +222,21 @@ export const inventoryService = {
         throw new Error('Cannot release more stock than is reserved');
       }
 
-      const updatedInventory: InventoryItem = {
-        ...currentInventory,
-        reserved_quantity: Math.max(0, currentInventory.reserved_quantity - quantity),
-        updated_at: new Date().toISOString()
-      };
+      const { data, error } = await supabase
+        .from('inventory')
+        .update({ 
+          reserved_quantity: Math.max(0, currentInventory.reserved_quantity - quantity),
+          updated_at: new Date().toISOString()
+        })
+        .eq('product_id', productId)
+        .select()
+        .single();
 
-      // Simulate API delay
-      await new Promise(resolve => setTimeout(resolve, 400));
-      return updatedInventory;
+      if (error) {
+        throw error;
+      }
+
+      return data;
     } catch (error) {
       console.error('Error releasing stock:', error);
       throw new Error('Failed to release stock');

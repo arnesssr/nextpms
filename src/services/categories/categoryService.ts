@@ -8,70 +8,63 @@ import {
   BulkCategoryOperation,
   CategoryImportData
 } from '../types';
-
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api';
+import { supabase } from '@/lib/supabaseClient';
 
 export class CategoryService {
-  private async fetchWithAuth(url: string, options: RequestInit = {}) {
-    const token = localStorage.getItem('authToken');
-    
-    const config: RequestInit = {
-      ...options,
-      headers: {
-        'Content-Type': 'application/json',
-        ...(token && { Authorization: `Bearer ${token}` }),
-        ...options.headers,
-      },
-    };
-
-    const response = await fetch(`${API_BASE_URL}${url}`, config);
-    
-    if (!response.ok) {
-      throw new Error(`API Error: ${response.status} ${response.statusText}`);
-    }
-    
-    return response.json();
-  }
 
   // Get all categories with filtering and pagination
   async getCategories(filters?: CategoryFilters): Promise<CategoriesResponse> {
     try {
-      const params = new URLSearchParams();
+      let query = supabase.from('categories').select('*', { count: 'exact' });
       
-      if (filters) {
-        Object.entries(filters).forEach(([key, value]) => {
-          if (value !== undefined && value !== null && value !== '') {
-            params.append(key, String(value));
-          }
-        });
+      // Apply filters
+      if (filters?.search) {
+        query = query.or(`name.ilike.%${filters.search}%,description.ilike.%${filters.search}%`);
       }
       
-      const queryString = params.toString();
-      const url = `/api/categories${queryString ? `?${queryString}` : ''}`;
-      
-      const response = await fetch(url, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+      if (filters?.parent_id !== undefined) {
+        if (filters.parent_id === null) {
+          query = query.is('parent_id', null);
+        } else {
+          query = query.eq('parent_id', filters.parent_id);
+        }
       }
-
-      const result = await response.json();
       
-      if (!result.success) {
-        throw new Error(result.error || 'Failed to fetch categories');
+      if (filters?.status) {
+        query = query.eq('status', filters.status);
       }
-
+      
+      // Apply sorting
+      if (filters?.sort_by) {
+        const order = filters.sort_order === 'desc' ? { ascending: false } : { ascending: true };
+        query = query.order(filters.sort_by, order);
+      } else {
+        query = query.order('name', { ascending: true });
+      }
+      
+      // Apply pagination
+      const page = filters?.page || 1;
+      const limit = filters?.limit || 20;
+      const from = (page - 1) * limit;
+      const to = from + limit - 1;
+      
+      query = query.range(from, to);
+      
+      const { data, error, count } = await query;
+      
+      if (error) {
+        throw new Error(error.message);
+      }
+      
+      const total = count || 0;
+      const total_pages = Math.ceil(total / limit);
+      
       return {
-        data: result.data || [],
-        total: result.total || 0,
-        page: result.page || 1,
-        limit: result.limit || 20,
-        total_pages: result.total_pages || 0
+        data: data || [],
+        total,
+        page,
+        limit,
+        total_pages
       };
     } catch (error) {
       console.error('Error fetching categories:', error);
@@ -82,24 +75,42 @@ export class CategoryService {
   // Get category tree structure
   async getCategoryTree(): Promise<CategoryTree[]> {
     try {
-      const response = await fetch('/api/categories/tree', {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const result = await response.json();
+      const { data, error } = await supabase
+        .from('categories')
+        .select('*')
+        .eq('status', 'active')
+        .order('name', { ascending: true });
       
-      if (!result.success) {
-        throw new Error(result.error || 'Failed to fetch category tree');
+      if (error) {
+        throw new Error(error.message);
       }
-
-      return result.data || [];
+      
+      // Build tree structure
+      const categories = data || [];
+      const categoryMap = new Map<string, CategoryTree>();
+      const rootCategories: CategoryTree[] = [];
+      
+      // First pass: create all nodes
+      categories.forEach(category => {
+        categoryMap.set(category.id, {
+          ...category,
+          children: []
+        });
+      });
+      
+      // Second pass: build parent-child relationships
+      categories.forEach(category => {
+        const categoryNode = categoryMap.get(category.id)!;
+        
+        if (category.parent_id && categoryMap.has(category.parent_id)) {
+          const parent = categoryMap.get(category.parent_id)!;
+          parent.children.push(categoryNode);
+        } else {
+          rootCategories.push(categoryNode);
+        }
+      });
+      
+      return rootCategories;
     } catch (error) {
       console.error('Error fetching category tree:', error);
       throw new Error('Failed to fetch category tree');
@@ -109,8 +120,21 @@ export class CategoryService {
   // Get single category by ID
   async getCategory(id: string): Promise<Category> {
     try {
-      const response = await this.fetchWithAuth(`/categories/${id}`);
-      return response.data;
+      const { data, error } = await supabase
+        .from('categories')
+        .select('*')
+        .eq('id', id)
+        .single();
+      
+      if (error) {
+        throw new Error(error.message);
+      }
+      
+      if (!data) {
+        throw new Error('Category not found');
+      }
+      
+      return data;
     } catch (error) {
       console.error('Error fetching category:', error);
       throw new Error('Failed to fetch category');
@@ -120,25 +144,38 @@ export class CategoryService {
   // Create new category
   async createCategory(data: CategoryFormData): Promise<Category> {
     try {
-      const response = await fetch('/api/categories', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(data),
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const result = await response.json();
+      // Generate slug if not provided
+      const slug = data.slug || this.generateSlug(data.name);
       
-      if (!result.success) {
-        throw new Error(result.error || 'Failed to create category');
+      // Sanitize parent_id - convert empty string to null
+      const sanitizedData = { ...data };
+      if (sanitizedData.parent_id === '' || sanitizedData.parent_id === undefined) {
+        sanitizedData.parent_id = null;
       }
-
-      return result.data;
+      
+      const categoryData = {
+        ...sanitizedData,
+        slug,
+        status: sanitizedData.status || 'active',
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      };
+      
+      const { data: newCategory, error } = await supabase
+        .from('categories')
+        .insert([categoryData])
+        .select()
+        .single();
+      
+      if (error) {
+        throw new Error(error.message);
+      }
+      
+      if (!newCategory) {
+        throw new Error('Failed to create category');
+      }
+      
+      return newCategory;
     } catch (error) {
       console.error('Error creating category:', error);
       throw new Error('Failed to create category');
@@ -148,25 +185,32 @@ export class CategoryService {
   // Update existing category
   async updateCategory(id: string, data: Partial<CategoryFormData>): Promise<Category> {
     try {
-      const response = await fetch(`/api/categories/${id}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(data),
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const result = await response.json();
+      const updateData = {
+        ...data,
+        updated_at: new Date().toISOString()
+      };
       
-      if (!result.success) {
-        throw new Error(result.error || 'Failed to update category');
+      // Generate slug if name is being updated and slug is not provided
+      if (data.name && !data.slug) {
+        updateData.slug = this.generateSlug(data.name);
       }
-
-      return result.data;
+      
+      const { data: updatedCategory, error } = await supabase
+        .from('categories')
+        .update(updateData)
+        .eq('id', id)
+        .select()
+        .single();
+      
+      if (error) {
+        throw new Error(error.message);
+      }
+      
+      if (!updatedCategory) {
+        throw new Error('Category not found');
+      }
+      
+      return updatedCategory;
     } catch (error) {
       console.error('Error updating category:', error);
       throw new Error('Failed to update category');
@@ -176,21 +220,13 @@ export class CategoryService {
   // Delete category
   async deleteCategory(id: string): Promise<void> {
     try {
-      const response = await fetch(`/api/categories/${id}`, {
-        method: 'DELETE',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      });
+      const { error } = await supabase
+        .from('categories')
+        .delete()
+        .eq('id', id);
 
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const result = await response.json();
-      
-      if (!result.success) {
-        throw new Error(result.error || 'Failed to delete category');
+      if (error) {
+        throw new Error(error.message);
       }
     } catch (error) {
       console.error('Error deleting category:', error);
@@ -201,24 +237,41 @@ export class CategoryService {
   // Get category statistics
   async getCategoryStats(): Promise<CategoryStats> {
     try {
-      const response = await fetch('/api/categories/stats', {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      });
+      // Get total categories count
+      const { count: totalCategories, error: totalError } = await supabase
+        .from('categories')
+        .select('*', { count: 'exact', head: true });
 
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+      if (totalError) {
+        throw new Error(totalError.message);
       }
 
-      const result = await response.json();
-      
-      if (!result.success) {
-        throw new Error(result.error || 'Failed to fetch category statistics');
+      // Get active categories count
+      const { count: activeCategories, error: activeError } = await supabase
+        .from('categories')
+        .select('*', { count: 'exact', head: true })
+        .eq('status', 'active');
+
+      if (activeError) {
+        throw new Error(activeError.message);
       }
 
-      return result.data;
+      // Get root categories count (no parent)
+      const { count: rootCategories, error: rootError } = await supabase
+        .from('categories')
+        .select('*', { count: 'exact', head: true })
+        .is('parent_id', null);
+
+      if (rootError) {
+        throw new Error(rootError.message);
+      }
+
+      return {
+        total: totalCategories || 0,
+        active: activeCategories || 0,
+        inactive: (totalCategories || 0) - (activeCategories || 0),
+        root_categories: rootCategories || 0
+      };
     } catch (error) {
       console.error('Error fetching category stats:', error);
       throw new Error('Failed to fetch category statistics');
@@ -228,10 +281,27 @@ export class CategoryService {
   // Bulk operations
   async bulkOperation(operation: BulkCategoryOperation): Promise<void> {
     try {
-      await this.fetchWithAuth('/categories/bulk', {
-        method: 'POST',
-        body: JSON.stringify(operation),
-      });
+      const { type, category_ids, data } = operation;
+      
+      if (type === 'delete') {
+        const { error } = await supabase
+          .from('categories')
+          .delete()
+          .in('id', category_ids);
+        
+        if (error) {
+          throw new Error(error.message);
+        }
+      } else if (type === 'update') {
+        const { error } = await supabase
+          .from('categories')
+          .update({ ...data, updated_at: new Date().toISOString() })
+          .in('id', category_ids);
+        
+        if (error) {
+          throw new Error(error.message);
+        }
+      }
     } catch (error) {
       console.error('Error performing bulk operation:', error);
       throw new Error('Failed to perform bulk operation');
@@ -241,10 +311,24 @@ export class CategoryService {
   // Move category to new parent
   async moveCategory(categoryId: string, newParentId?: string, newPosition?: number): Promise<void> {
     try {
-      await this.fetchWithAuth(`/categories/${categoryId}/move`, {
-        method: 'POST',
-        body: JSON.stringify({ parent_id: newParentId, position: newPosition }),
-      });
+      const updateData: any = {
+        parent_id: newParentId || null,
+        updated_at: new Date().toISOString()
+      };
+      
+      // Note: position handling would require additional logic for ordering
+      if (newPosition !== undefined) {
+        updateData.sort_order = newPosition;
+      }
+      
+      const { error } = await supabase
+        .from('categories')
+        .update(updateData)
+        .eq('id', categoryId);
+      
+      if (error) {
+        throw new Error(error.message);
+      }
     } catch (error) {
       console.error('Error moving category:', error);
       throw new Error('Failed to move category');
@@ -254,10 +338,46 @@ export class CategoryService {
   // Duplicate category
   async duplicateCategory(id: string): Promise<Category> {
     try {
-      const response = await this.fetchWithAuth(`/categories/${id}/duplicate`, {
-        method: 'POST',
-      });
-      return response.data;
+      // First get the original category
+      const { data: originalCategory, error: fetchError } = await supabase
+        .from('categories')
+        .select('*')
+        .eq('id', id)
+        .single();
+      
+      if (fetchError) {
+        throw new Error(fetchError.message);
+      }
+      
+      if (!originalCategory) {
+        throw new Error('Category not found');
+      }
+      
+      // Create duplicate with modified name and slug
+      const duplicateData = {
+        ...originalCategory,
+        id: undefined, // Let Supabase generate new ID
+        name: `${originalCategory.name} (Copy)`,
+        slug: `${originalCategory.slug}-copy`,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      };
+      
+      const { data: newCategory, error: createError } = await supabase
+        .from('categories')
+        .insert([duplicateData])
+        .select()
+        .single();
+      
+      if (createError) {
+        throw new Error(createError.message);
+      }
+      
+      if (!newCategory) {
+        throw new Error('Failed to duplicate category');
+      }
+      
+      return newCategory;
     } catch (error) {
       console.error('Error duplicating category:', error);
       throw new Error('Failed to duplicate category');
@@ -267,11 +387,24 @@ export class CategoryService {
   // Import categories
   async importCategories(data: CategoryImportData[]): Promise<Category[]> {
     try {
-      const response = await this.fetchWithAuth('/categories/import', {
-        method: 'POST',
-        body: JSON.stringify({ categories: data }),
-      });
-      return response.data;
+      const categoriesToInsert = data.map(category => ({
+        ...category,
+        slug: category.slug || this.generateSlug(category.name),
+        status: category.status || 'active',
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      }));
+      
+      const { data: newCategories, error } = await supabase
+        .from('categories')
+        .insert(categoriesToInsert)
+        .select();
+      
+      if (error) {
+        throw new Error(error.message);
+      }
+      
+      return newCategories || [];
     } catch (error) {
       console.error('Error importing categories:', error);
       throw new Error('Failed to import categories');
