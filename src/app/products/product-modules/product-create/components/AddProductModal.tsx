@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Plus } from 'lucide-react';
-import ProductForm from '@/components/forms/ProductForm';
+import { ProductForm } from '@/components/forms/ProductForm';
 import { Product, CreateProductData } from '@/types/products';
 
 interface AddProductModalProps {
@@ -47,7 +47,7 @@ export default function AddProductModal({ onProductCreated, trigger }: AddProduc
           <div className="py-4">
             <ProductForm
               onSuccess={handleSuccess}
-              onCancel={() => setIsOpen(false)}
+              onClose={() => setIsOpen(false)}
             />
           </div>
         </DialogContent>
