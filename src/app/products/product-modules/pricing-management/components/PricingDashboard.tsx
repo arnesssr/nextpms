@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -26,7 +26,11 @@ import {
 } from 'lucide-react';
 import { usePricing } from '../hooks/usePricing';
 import { usePriceHistory } from '../hooks/usePriceHistory';
+import { priceHistoryService } from '../services/priceHistoryService';
 import { ProfitMarginIndicator } from './ProfitMarginIndicator';
+import { BulkPriceUpdate } from './BulkPriceUpdate';
+import { PricingCalculator } from './PricingCalculator';
+import { productService } from '@/services/products';
 
 interface PricingDashboardProps {
   productId?: string;
@@ -38,36 +42,43 @@ export const PricingDashboard: React.FC<PricingDashboardProps> = ({
   showProductSelection = true
 }) => {
   const { analytics, loading, error } = usePricing();
-  const { recentChanges, stats } = usePriceHistory();
+  const { recentChanges, stats, refreshAllData } = usePriceHistory();
+  
   const [selectedTimeframe, setSelectedTimeframe] = useState<'7d' | '30d' | '90d'>('30d');
+  const [products, setProducts] = useState<any[]>([]);
+  const [productsLoading, setProductsLoading] = useState(true);
+  const [productsError, setProductsError] = useState<string | null>(null);
+  const [bulkUpdateOpen, setBulkUpdateOpen] = useState(false);
+  const [calculatorOpen, setCalculatorOpen] = useState(false);
 
-  // Mock product data for demo
-  const mockProducts = [
-    {
-      id: '1',
-      name: 'Wireless Headphones',
-      sku: 'WH-001',
-      cost_price: 60.00,
-      selling_price: 99.99,
-      category: 'Electronics'
-    },
-    {
-      id: '2',
-      name: 'Bluetooth Speaker',
-      sku: 'BS-002',
-      cost_price: 25.00,
-      selling_price: 49.99,
-      category: 'Electronics'
-    },
-    {
-      id: '3',
-      name: 'Phone Case',
-      sku: 'PC-003',
-      cost_price: 5.00,
-      selling_price: 19.99,
-      category: 'Accessories'
-    }
-  ];
+  // Fetch real product data and debug price history
+  useEffect(() => {
+    const fetchProducts = async () => {
+      try {
+        setProductsLoading(true);
+        const response = await productService.getProducts({ 
+          per_page: 10, 
+          page: 1,
+          sort_by: 'created_at',
+          sort_order: 'desc'
+        });
+        
+        // Filter products that have both base_price and selling_price
+        const productsWithPricing = response.data.filter(product => 
+          product.base_price && product.selling_price
+        );
+        
+        setProducts(productsWithPricing.slice(0, 5)); // Show top 5 products
+      } catch (error) {
+        console.error('Error fetching products:', error);
+        setProductsError('Failed to load products');
+      } finally {
+        setProductsLoading(false);
+      }
+    };
+
+    fetchProducts();
+  }, []);
 
   const getChangeIcon = (changeType: string) => {
     switch (changeType) {
@@ -128,67 +139,42 @@ export const PricingDashboard: React.FC<PricingDashboardProps> = ({
 
   return (
     <div className="space-y-6">
-      {/* Analytics Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Average Margin</CardTitle>
-            <Target className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-green-600">
-              {analytics?.avg_profit_margin.toFixed(1)}%
-            </div>
-            <p className="text-xs text-muted-foreground">
-              Across all products
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Revenue Potential</CardTitle>
-            <DollarSign className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              ${analytics?.total_revenue_potential.toLocaleString()}
-            </div>
-            <p className="text-xs text-muted-foreground">
-              Total catalog value
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Low Margin Products</CardTitle>
-            <AlertTriangle className="h-4 w-4 text-orange-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-orange-600">
-              {analytics?.products_with_low_margin}
-            </div>
-            <p className="text-xs text-muted-foreground">
-              Need attention
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Recent Changes</CardTitle>
-            <BarChart3 className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              {stats?.total_changes || 0}
-            </div>
-            <p className="text-xs text-muted-foreground">
-              Last 30 days
-            </p>
-          </CardContent>
-        </Card>
+      {/* Quick Action Buttons */}
+      <div className="flex flex-wrap gap-2">
+        <Button onClick={() => setBulkUpdateOpen(true)}>
+          <Edit className="mr-2 h-4 w-4" />
+          Bulk Price Update
+        </Button>
+        <Button variant="outline" onClick={() => setCalculatorOpen(true)}>
+          <Calculator className="mr-2 h-4 w-4" />
+          Pricing Calculator
+        </Button>
+        <Button variant="outline">
+          <BarChart3 className="mr-2 h-4 w-4" />
+          Price Analysis
+        </Button>
+        <Button 
+          variant="outline" 
+          onClick={async () => {
+            try {
+              console.log('🔄 Testing recent changes fetch...');
+              const changes = await priceHistoryService.getRecentPriceChanges(10);
+              console.log('📊 Recent changes found:', changes.length);
+              if (changes.length > 0) {
+                alert(`✅ Found ${changes.length} recent changes. Refreshing UI...`);
+                await refreshAllData();
+              } else {
+                alert('❌ No recent changes found in database');
+              }
+            } catch (error) {
+              console.error('❌ Error:', error);
+              alert(`❌ Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+            }
+          }}
+          className="text-xs"
+        >
+          🔄 Test Refresh
+        </Button>
       </div>
 
       {/* Product Pricing Overview */}
@@ -205,27 +191,41 @@ export const PricingDashboard: React.FC<PricingDashboardProps> = ({
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            {mockProducts.map((product) => (
-              <div key={product.id} className="space-y-2">
-                <div className="flex justify-between items-center">
-                  <div>
-                    <div className="font-medium">{product.name}</div>
-                    <div className="text-sm text-muted-foreground">{product.sku}</div>
-                  </div>
-                  <div className="text-right">
-                    <div className="font-mono text-sm">${product.selling_price}</div>
-                    <div className="text-xs text-muted-foreground">
-                      Cost: ${product.cost_price}
+            {productsLoading ? (
+              <div className="text-center py-4">
+                <div className="text-sm text-muted-foreground">Loading products...</div>
+              </div>
+            ) : productsError ? (
+              <div className="text-center py-4">
+                <div className="text-sm text-red-600">{productsError}</div>
+              </div>
+            ) : products.length === 0 ? (
+              <div className="text-center py-4">
+                <div className="text-sm text-muted-foreground">No products with pricing data found</div>
+              </div>
+            ) : (
+              products.map((product) => (
+                <div key={product.id} className="space-y-2">
+                  <div className="flex justify-between items-center">
+                    <div>
+                      <div className="font-medium">{product.name}</div>
+                      <div className="text-sm text-muted-foreground">{product.sku || 'No SKU'}</div>
+                    </div>
+                    <div className="text-right">
+                      <div className="font-mono text-sm">${product.selling_price?.toFixed(2)}</div>
+                      <div className="text-xs text-muted-foreground">
+                        Cost: ${product.base_price?.toFixed(2)}
+                      </div>
                     </div>
                   </div>
+                  <ProfitMarginIndicator
+                    costPrice={product.base_price}
+                    sellingPrice={product.selling_price}
+                    size="sm"
+                  />
                 </div>
-                <ProfitMarginIndicator
-                  costPrice={product.cost_price}
-                  sellingPrice={product.selling_price}
-                  size="sm"
-                />
-              </div>
-            ))}
+              ))
+            )}
           </CardContent>
         </Card>
 
@@ -251,57 +251,85 @@ export const PricingDashboard: React.FC<PricingDashboardProps> = ({
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {recentChanges.slice(0, 5).map((change) => (
-                  <TableRow key={change.id}>
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        {getChangeIcon(change.change_type)}
-                        <div>
-                          <div className="font-medium">Product #{change.product_id}</div>
-                          <div className="text-xs text-muted-foreground">
-                            by {change.changed_by}
-                          </div>
-                        </div>
+                {recentChanges.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={4} className="text-center py-4">
+                      <div className="text-muted-foreground">
+                        {loading ? 'Loading recent changes...' : 'No recent price changes found'}
                       </div>
                     </TableCell>
-                    <TableCell>
-                      {formatPriceChange(change.old_price, change.new_price)}
-                    </TableCell>
-                    <TableCell>
-                      <span className="text-sm">{change.change_reason}</span>
-                    </TableCell>
-                    <TableCell>
-                      <span className="text-sm text-muted-foreground">
-                        {new Date(change.changed_at).toLocaleDateString()}
-                      </span>
-                    </TableCell>
                   </TableRow>
-                ))}
+                ) : (
+                  recentChanges.slice(0, 5).map((change) => (
+                    <TableRow key={change.id}>
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          {getChangeIcon(change.change_type)}
+                          <div>
+                            <div className="font-medium">
+                              {/* Use product_name from price history if available, otherwise fallback */}
+                              {change.product_name || products.find(p => p.id === change.product_id)?.name || `Product ${change.product_id.slice(-8)}`}
+                            </div>
+                            <div className="text-xs text-muted-foreground">
+                              by {change.changed_by}
+                            </div>
+                          </div>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        {formatPriceChange(change.old_price, change.new_price)}
+                      </TableCell>
+                      <TableCell>
+                        <span className="text-sm">{change.change_reason}</span>
+                      </TableCell>
+                      <TableCell>
+                        <span className="text-sm text-muted-foreground">
+                          {new Date(change.changed_at).toLocaleDateString()}
+                        </span>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
               </TableBody>
             </Table>
           </CardContent>
         </Card>
       </div>
 
-      {/* Action Buttons */}
-      <div className="flex flex-wrap gap-2">
-        <Button>
-          <Edit className="mr-2 h-4 w-4" />
-          Bulk Price Update
-        </Button>
-        <Button variant="outline">
-          <Calculator className="mr-2 h-4 w-4" />
-          Pricing Calculator
-        </Button>
-        <Button variant="outline">
-          <BarChart3 className="mr-2 h-4 w-4" />
-          Price Analysis
-        </Button>
-        <Button variant="outline">
-          <History className="mr-2 h-4 w-4" />
-          Full History
-        </Button>
-      </div>
+      {/* Bulk Price Update Modal */}
+      <BulkPriceUpdate
+        isOpen={bulkUpdateOpen}
+        onClose={() => setBulkUpdateOpen(false)}
+        onSuccess={async () => {
+          // Refresh price history data and reload products
+          try {
+            await refreshAllData();
+            // Reload products to show updated prices
+            const response = await productService.getProducts({ 
+              per_page: 10, 
+              page: 1,
+              sort_by: 'created_at',
+              sort_order: 'desc'
+            });
+            
+            const productsWithPricing = response.data.filter(product => 
+              product.base_price && product.selling_price
+            );
+            
+            setProducts(productsWithPricing.slice(0, 5));
+          } catch (error) {
+            console.error('Error refreshing data after bulk update:', error);
+            // Fallback to simple page reload if refresh fails
+            window.location.reload();
+          }
+        }}
+      />
+
+      {/* Pricing Calculator Modal */}
+      <PricingCalculator
+        isOpen={calculatorOpen}
+        onClose={() => setCalculatorOpen(false)}
+      />
     </div>
   );
 };

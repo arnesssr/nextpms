@@ -1,4 +1,4 @@
-// Media-related types
+// Media-related types - aligned with database schema
 export interface MediaFile {
   id: string;
   product_id: string;
@@ -14,6 +14,19 @@ export interface MediaFile {
   uploaded_by: string;
   uploaded_at: string;
   updated_at: string;
+  // Additional fields from database schema
+  bucket_name?: string;
+  storage_path?: string;
+  mime_type?: string;
+  file_extension?: string;
+  media_type?: 'image' | 'document' | 'video' | 'audio' | 'other';
+  usage_type?: 'product_primary' | 'product_gallery' | 'product_document' | 'category_banner' | 'user_avatar' | 'general';
+  is_active?: boolean;
+  is_featured?: boolean;
+  visibility?: 'public' | 'private' | 'restricted';
+  tags?: string[];
+  description?: string;
+  caption?: string;
 }
 
 export interface MediaUpload {

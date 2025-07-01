@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { PriceHistory } from '../types';
 import { priceHistoryService } from '../services/priceHistoryService';
 
@@ -24,11 +24,17 @@ interface UsePriceHistoryActions {
   fetchPriceChangeStats: (days?: number) => Promise<void>;
   createHistoryEntry: (entry: Omit<PriceHistory, 'id' | 'changed_at'>) => Promise<void>;
   clearHistory: () => void;
+  refreshAllData: () => Promise<void>;
 }
 
 export const usePriceHistory = (): UsePriceHistoryState & UsePriceHistoryActions => {
   const [history, setHistory] = useState<PriceHistory[]>([]);
   const [recentChanges, setRecentChanges] = useState<PriceHistory[]>([]);
+  
+  // Debug: Track recentChanges state changes
+  React.useEffect(() => {
+    console.log('🔍 Hook recentChanges state changed:', recentChanges.length, recentChanges);
+  }, [recentChanges]);
   const [trends, setTrends] = useState<Array<{date: string, price: number}>>([]);
   const [stats, setStats] = useState<{
     total_changes: number;
@@ -39,6 +45,16 @@ export const usePriceHistory = (): UsePriceHistoryState & UsePriceHistoryActions
   } | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [hasInitiallyLoaded, setHasInitiallyLoaded] = useState(false);
+  
+  // Ref to track if component is mounted to prevent state updates after unmount
+  const isMountedRef = React.useRef(true);
+  
+  React.useEffect(() => {
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
 
   const fetchProductHistory = async (productId: string) => {
     setLoading(true);
@@ -56,14 +72,22 @@ export const usePriceHistory = (): UsePriceHistoryState & UsePriceHistoryActions
   };
 
   const fetchRecentChanges = async (limit: number = 20) => {
+    console.log('📝 Starting fetchRecentChanges, isMountedRef.current:', isMountedRef.current);
+    
     setLoading(true);
     setError(null);
     try {
       const changes = await priceHistoryService.getRecentPriceChanges(limit);
+      console.log('📊 Hook received changes:', changes.length, changes);
+      console.log('🔄 Setting recentChanges state with', changes.length, 'items');
       setRecentChanges(changes);
+      console.log('✅ RecentChanges state updated');
+      console.log('🔍 isMountedRef.current:', isMountedRef.current);
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to fetch recent price changes';
-      setError(errorMessage);
+      if (isMountedRef.current) {
+        setError(errorMessage);
+      }
       console.error('Error fetching recent price changes:', err);
     } finally {
       setLoading(false);
@@ -90,13 +114,19 @@ export const usePriceHistory = (): UsePriceHistoryState & UsePriceHistoryActions
     setError(null);
     try {
       const statistics = await priceHistoryService.getPriceChangeStats(days);
-      setStats(statistics);
+      if (isMountedRef.current) {
+        setStats(statistics);
+      }
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to fetch price change statistics';
-      setError(errorMessage);
+      if (isMountedRef.current) {
+        setError(errorMessage);
+      }
       console.error('Error fetching price change stats:', err);
     } finally {
-      setLoading(false);
+      if (isMountedRef.current) {
+        setLoading(false);
+      }
     }
   };
 
@@ -133,11 +163,39 @@ export const usePriceHistory = (): UsePriceHistoryState & UsePriceHistoryActions
     setStats(null);
     setError(null);
   };
+  
+  // Refresh all data (useful after bulk updates)
+  const refreshAllData = async () => {
+    if (!isMountedRef.current) return;
+    
+    try {
+      await Promise.all([
+        fetchRecentChanges(),
+        fetchPriceChangeStats()
+      ]);
+    } catch (err) {
+      console.error('❌ Error refreshing price history data:', err);
+    }
+  };
 
-  // Load initial data on mount
+  // Load initial data on mount (only once)
   useEffect(() => {
-    fetchRecentChanges();
-    fetchPriceChangeStats();
+    if (!hasInitiallyLoaded && isMountedRef.current) {
+      const loadInitialData = async () => {
+        try {
+          await Promise.all([
+            fetchRecentChanges(),
+            fetchPriceChangeStats()
+          ]);
+          if (isMountedRef.current) {
+            setHasInitiallyLoaded(true);
+          }
+        } catch (error) {
+          console.error('Error loading initial price history data:', error);
+        }
+      };
+      loadInitialData();
+    }
   }, []);
 
   return {
@@ -153,5 +211,6 @@ export const usePriceHistory = (): UsePriceHistoryState & UsePriceHistoryActions
     fetchPriceChangeStats,
     createHistoryEntry,
     clearHistory,
+    refreshAllData
   };
 };

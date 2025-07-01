@@ -1,93 +1,59 @@
 import { Discount, DiscountCreateRequest } from '../types';
+import { supabase } from '@/lib/supabaseClient';
+
+// Note: This service requires a 'discounts' table in Supabase
+// If the table doesn't exist, methods will return empty arrays or throw errors
 
 export const discountService = {
   // Get all active discounts
   async getActiveDiscounts(): Promise<Discount[]> {
     try {
-      // Mock implementation - replace with actual API call
-      const mockDiscounts: Discount[] = [
-        {
-          id: '1',
-          name: 'Summer Sale',
-          description: '20% off electronics for summer promotion',
-          discount_type: 'percentage',
-          value: 20,
-          applicable_categories: ['electronics'],
-          start_date: '2024-06-01T00:00:00Z',
-          end_date: '2024-08-31T23:59:59Z',
-          is_active: true,
-          usage_limit: 1000,
-          used_count: 157,
-          created_at: '2024-05-15T00:00:00Z',
-          updated_at: '2024-05-15T00:00:00Z'
-        },
-        {
-          id: '2', 
-          name: 'Buy 2 Get 1 Free',
-          description: 'Buy 2 phone cases, get 1 free',
-          discount_type: 'buy_x_get_y',
-          value: 1,
-          min_quantity: 2,
-          applicable_products: ['pc-001', 'pc-002', 'pc-003'],
-          start_date: '2024-01-01T00:00:00Z',
-          end_date: '2024-12-31T23:59:59Z',
-          is_active: true,
-          used_count: 45,
-          created_at: '2024-01-01T00:00:00Z',
-          updated_at: '2024-01-01T00:00:00Z'
-        },
-        {
-          id: '3',
-          name: 'Bulk Order Discount',
-          description: '$50 off orders over $500',
-          discount_type: 'fixed_amount',
-          value: 50,
-          min_order_value: 500,
-          start_date: '2024-01-01T00:00:00Z',
-          end_date: '2024-12-31T23:59:59Z',
-          is_active: true,
-          used_count: 23,
-          created_at: '2024-01-01T00:00:00Z',
-          updated_at: '2024-01-01T00:00:00Z'
-        }
-      ];
+      const { data, error } = await supabase
+        .from('discounts')
+        .select('*')
+        .eq('is_active', true)
+        .gte('end_date', new Date().toISOString())
+        .order('created_at', { ascending: false });
 
-      // Simulate API delay
-      await new Promise(resolve => setTimeout(resolve, 500));
-      return mockDiscounts.filter(discount => discount.is_active);
+      if (error) {
+        console.error('Supabase error fetching active discounts:', error);
+        // Return empty array if table doesn't exist
+        if (error.code === '42P01') {
+          console.warn('Discounts table does not exist');
+          return [];
+        }
+        throw new Error(error.message);
+      }
+
+      return data || [];
     } catch (error) {
       console.error('Error fetching active discounts:', error);
-      throw new Error('Failed to fetch active discounts');
+      return []; // Return empty array on error to prevent UI crashes
     }
   },
 
   // Get all discounts (active and inactive)
   async getAllDiscounts(): Promise<Discount[]> {
     try {
-      // Mock implementation - replace with actual API call
-      const activeDiscounts = await this.getActiveDiscounts();
-      
-      // Add some inactive discounts
-      const inactiveDiscounts: Discount[] = [
-        {
-          id: '4',
-          name: 'Black Friday 2023',
-          description: 'Expired Black Friday promotion',
-          discount_type: 'percentage',
-          value: 50,
-          start_date: '2023-11-24T00:00:00Z',
-          end_date: '2023-11-26T23:59:59Z',
-          is_active: false,
-          used_count: 2841,
-          created_at: '2023-11-01T00:00:00Z',
-          updated_at: '2023-11-01T00:00:00Z'
-        }
-      ];
+      const { data, error } = await supabase
+        .from('discounts')
+        .select('*')
+        .order('created_at', { ascending: false });
 
-      return [...activeDiscounts, ...inactiveDiscounts];
+      if (error) {
+        console.error('Supabase error fetching all discounts:', error);
+        // Return empty array if table doesn't exist
+        if (error.code === '42P01') {
+          console.warn('Discounts table does not exist');
+          return [];
+        }
+        throw new Error(error.message);
+      }
+
+      return data || [];
     } catch (error) {
       console.error('Error fetching all discounts:', error);
-      throw new Error('Failed to fetch discounts');
+      return []; // Return empty array on error to prevent UI crashes
     }
   },
 
@@ -100,19 +66,26 @@ export const discountService = {
         throw new Error(validation.errors.join(', '));
       }
 
-      // Mock implementation - replace with actual API call
-      const newDiscount: Discount = {
+      const discountData = {
         ...request,
-        id: Date.now().toString(),
         is_active: true,
         used_count: 0,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
       };
 
-      // Simulate API delay
-      await new Promise(resolve => setTimeout(resolve, 600));
-      return newDiscount;
+      const { data, error } = await supabase
+        .from('discounts')
+        .insert(discountData)
+        .select()
+        .single();
+
+      if (error) {
+        console.error('Supabase error creating discount:', error);
+        throw new Error(error.message);
+      }
+
+      return data;
     } catch (error) {
       console.error('Error creating discount:', error);
       throw new Error('Failed to create discount');
@@ -122,21 +95,28 @@ export const discountService = {
   // Update existing discount
   async updateDiscount(id: string, updates: Partial<Discount>): Promise<Discount> {
     try {
-      // Mock implementation - replace with actual API call
-      const existingDiscount = await this.getDiscountById(id);
-      if (!existingDiscount) {
-        throw new Error('Discount not found');
-      }
-
-      const updatedDiscount: Discount = {
-        ...existingDiscount,
+      const updateData = {
         ...updates,
         updated_at: new Date().toISOString()
       };
 
-      // Simulate API delay
-      await new Promise(resolve => setTimeout(resolve, 400));
-      return updatedDiscount;
+      const { data, error } = await supabase
+        .from('discounts')
+        .update(updateData)
+        .eq('id', id)
+        .select()
+        .single();
+
+      if (error) {
+        console.error('Supabase error updating discount:', error);
+        throw new Error(error.message);
+      }
+
+      if (!data) {
+        throw new Error('Discount not found');
+      }
+
+      return data;
     } catch (error) {
       console.error('Error updating discount:', error);
       throw new Error('Failed to update discount');
@@ -146,11 +126,15 @@ export const discountService = {
   // Delete discount
   async deleteDiscount(id: string): Promise<void> {
     try {
-      // Mock implementation - replace with actual API call
-      // In real implementation, you might want to soft delete or check usage
-      
-      // Simulate API delay
-      await new Promise(resolve => setTimeout(resolve, 300));
+      const { error } = await supabase
+        .from('discounts')
+        .delete()
+        .eq('id', id);
+
+      if (error) {
+        console.error('Supabase error deleting discount:', error);
+        throw new Error(error.message);
+      }
     } catch (error) {
       console.error('Error deleting discount:', error);
       throw new Error('Failed to delete discount');
@@ -160,11 +144,24 @@ export const discountService = {
   // Get discount by ID
   async getDiscountById(id: string): Promise<Discount | null> {
     try {
-      const allDiscounts = await this.getAllDiscounts();
-      return allDiscounts.find(discount => discount.id === id) || null;
+      const { data, error } = await supabase
+        .from('discounts')
+        .select('*')
+        .eq('id', id)
+        .single();
+
+      if (error) {
+        if (error.code === 'PGRST116') {
+          return null; // Not found
+        }
+        console.error('Supabase error fetching discount by ID:', error);
+        throw new Error(error.message);
+      }
+
+      return data;
     } catch (error) {
       console.error('Error fetching discount by ID:', error);
-      throw new Error('Failed to fetch discount');
+      return null;
     }
   },
 

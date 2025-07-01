@@ -18,7 +18,6 @@ import { InventoryDashboard } from '../product-modules/inventory-management/comp
 import { PricingDashboard } from '../product-modules/pricing-management/components/PricingDashboard';
 import { ProductCatalogList } from '../product-modules/product-catalog/components/ProductCatalogList';
 import { Product } from '../product-modules/product-catalog/types';
-import MediaManagementTab from './MediaManagementTab';
 
 interface ProductModuleTabsProps {
   onCreateProduct?: () => void;
@@ -45,7 +44,7 @@ const productModules = [
     id: 'pricing',
     label: 'Pricing',
     icon: DollarSign,
-    description: 'Manage product pricing and profit margins'
+    description: ''
   },
   {
     id: 'list',
@@ -53,12 +52,6 @@ const productModules = [
     icon: List,
     description: 'View products in grid or list format'
   },
-  {
-    id: 'media',
-    label: 'Media',
-    icon: Images,
-    description: 'Manage product images and media files'
-  }
 ];
 
 export const ProductModuleTabs: React.FC<ProductModuleTabsProps> = ({
@@ -98,12 +91,6 @@ export const ProductModuleTabs: React.FC<ProductModuleTabsProps> = ({
           />
         );
       
-      case 'media':
-        return (
-          <MediaManagementTab 
-            productId="sample-product-1" // This should come from props or context
-          />
-        );
       
       default:
         return (
@@ -118,7 +105,7 @@ export const ProductModuleTabs: React.FC<ProductModuleTabsProps> = ({
   return (
     <div className="space-y-6">
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-5 lg:w-auto lg:grid-cols-5 gap-1 h-auto p-1">
+        <TabsList className="grid w-full grid-cols-4 lg:w-auto lg:grid-cols-4 gap-1 h-auto p-1">
           {productModules.map((module) => {
             const IconComponent = module.icon;
             return (
@@ -135,20 +122,6 @@ export const ProductModuleTabs: React.FC<ProductModuleTabsProps> = ({
           })}
         </TabsList>
 
-        {/* Tab Content Description */}
-        <div className="mt-4">
-          {productModules.map((module) => (
-            <div key={module.id} className={activeTab === module.id ? 'block' : 'hidden'}>
-              <div className="flex items-center space-x-2 mb-4">
-                <module.icon size={20} className="text-primary" />
-                <div>
-                  <h3 className="text-lg font-semibold">{module.label}</h3>
-                  <p className="text-sm text-muted-foreground">{module.description}</p>
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
 
         {/* Tab Content */}
         {productModules.map((module) => (

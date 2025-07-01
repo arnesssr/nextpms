@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import { Plus, Search, Filter, Eye, Edit, Trash2 } from 'lucide-react';
 import { useProducts } from '../hooks/useProducts';
 import { usePagination } from '../hooks/usePagination';
-import { Product } from '../../product-catalog/types';
+import { ProductWithCategory } from '@/types/products';
 import { ViewMode, SortField, SortOrder } from '../types';
 import ProductCard from './ProductCard';
 import Loading from './Loading';
@@ -19,8 +19,8 @@ import { formatProductData } from '../services/formatProductData';
 
 interface ProductListProps {
   onCreateProduct?: () => void;
-  onEditProduct?: (product: Product) => void;
-  onViewProduct?: (product: Product) => void;
+  onEditProduct?: (product: ProductWithCategory) => void;
+  onViewProduct?: (product: ProductWithCategory) => void;
 }
 
 export const ProductList: React.FC<ProductListProps> = ({
@@ -106,20 +106,6 @@ export const ProductList: React.FC<ProductListProps> = ({
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Products</h1>
-          <p className="text-gray-600">Manage your product catalog</p>
-        </div>
-        <button
-          onClick={onCreateProduct}
-          className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 flex items-center space-x-2"
-        >
-          <Plus size={20} />
-          <span>Add Product</span>
-        </button>
-      </div>
 
       {/* Search and Controls */}
       <div className="bg-white p-4 rounded-lg shadow-sm border">
@@ -147,9 +133,7 @@ export const ProductList: React.FC<ProductListProps> = ({
       {paginatedProducts.length === 0 ? (
         <EmptyState 
           title="No products found" 
-          message="Try adjusting your search or filter criteria"
-          onAction={onCreateProduct}
-          actionLabel="Add Your First Product"
+          message="Try adjusting your search or filter criteria. Use the Add Product button in the top navigation to create your first product."
         />
       ) : (
         <>

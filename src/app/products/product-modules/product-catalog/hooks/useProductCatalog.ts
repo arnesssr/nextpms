@@ -33,15 +33,20 @@ export const useProductCatalog = (): UseProductCatalogState & UseProductCatalogA
     setError(null);
     try {
       const data = await fetchProducts();
-      const formattedProducts = data?.map(product => ({
+      const formattedProducts = data?.map(product => {
+        // Extract category name from nested category object or fallback
+        // Handle both nested object and direct field cases
+        const categoryName = product.categories?.name || product.category_name || 'Uncategorized';
+        
+        return {
         id: product.id,
         name: product.name,
         description: product.description || '',
         sku: product.sku || `SKU-${product.id}`,
         barcode: product.barcode,
         category_id: product.category_id || '',
-        category: product.category_name || 'Uncategorized', // Use category_name from API
-        category_name: product.category_name || 'Uncategorized',
+        category: categoryName, // Use category name from joined data
+        category_name: categoryName,
         supplier_id: product.supplier_id,
         base_price: product.base_price || 0,
         selling_price: product.selling_price || 0,
@@ -61,7 +66,8 @@ export const useProductCatalog = (): UseProductCatalogState & UseProductCatalogA
         created_at: product.created_at || product.createdAt,
         updated_at: product.updated_at || product.updatedAt,
         created_by: product.created_by || 'system'
-      })) || [];
+      };
+      }) || [];
       
       setAllProducts(formattedProducts);
       setProducts(formattedProducts);

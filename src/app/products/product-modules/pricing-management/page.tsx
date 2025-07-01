@@ -8,7 +8,6 @@ import {
   DollarSign, 
   TrendingUp, 
   Calculator, 
-  History, 
   Settings, 
   Download,
   Upload,
@@ -45,9 +44,6 @@ export default function PricingManagementPage() {
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Pricing Management</h1>
-          <p className="text-muted-foreground">
-            Manage product pricing, profit margins, and pricing strategies
-          </p>
         </div>
         
         <div className="flex flex-wrap gap-2">
@@ -87,7 +83,7 @@ export default function PricingManagementPage() {
 
       {/* Navigation Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="dashboard" className="flex items-center gap-2">
             <TrendingUp className="h-4 w-4" />
             Dashboard
@@ -95,10 +91,6 @@ export default function PricingManagementPage() {
           <TabsTrigger value="calculator" className="flex items-center gap-2">
             <Calculator className="h-4 w-4" />
             Calculator
-          </TabsTrigger>
-          <TabsTrigger value="history" className="flex items-center gap-2">
-            <History className="h-4 w-4" />
-            Price History
           </TabsTrigger>
           <TabsTrigger value="rules" className="flex items-center gap-2">
             <Settings className="h-4 w-4" />
@@ -241,27 +233,6 @@ export default function PricingManagementPage() {
           </div>
         </TabsContent>
 
-        {/* Price History Tab */}
-        <TabsContent value="history" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <History className="h-5 w-5" />
-                Price Change History
-              </CardTitle>
-              <CardDescription>
-                Track all pricing changes across your product catalog
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="text-center py-12 text-muted-foreground">
-                <History className="mx-auto h-12 w-12 mb-4" />
-                <p>Price history component will be implemented here</p>
-                <p className="text-sm">View detailed price change logs, trends, and analytics</p>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
 
         {/* Pricing Rules Tab */}
         <TabsContent value="rules" className="space-y-6">

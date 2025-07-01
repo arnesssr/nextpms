@@ -1,24 +1,24 @@
 import { useState, useEffect } from 'react';
-import { Product } from '../../../types/product-types';
-import { ProductService as productService } from '@/services/products';
+import { ProductWithCategory } from '@/types/products';
+import { productService } from '@/services/products';
 
 interface UseProductsState {
-  products: Product[];
+  products: ProductWithCategory[];
   loading: boolean;
   error: string | null;
 }
 
 interface UseProductsActions {
   fetchProducts: () => Promise<void>;
-  createProduct: (product: Omit<Product, 'id' | 'created_at' | 'updated_at'>) => Promise<void>;
-  updateProduct: (id: string, updates: Partial<Product>) => Promise<void>;
+  createProduct: (product: any) => Promise<void>;
+  updateProduct: (id: string, updates: any) => Promise<void>;
   deleteProduct: (id: string) => Promise<void>;
   searchProducts: (query: string) => Promise<void>;
   filterProducts: (filters: Record<string, any>) => Promise<void>;
 }
 
 export const useProducts = (): UseProductsState & UseProductsActions => {
-  const [products, setProducts] = useState<Product[]>([]);
+  const [products, setProducts] = useState<ProductWithCategory[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -35,11 +35,12 @@ export const useProducts = (): UseProductsState & UseProductsActions => {
     }
   };
 
-  const createProduct = async (product: Omit<Product, 'id' | 'created_at' | 'updated_at'>) => {
+  const createProduct = async (product: any) => {
     setLoading(true);
     setError(null);
     try {
-      const newProduct = await productService.createProduct(product);
+      const response = await productService.createProduct(product);
+      const newProduct = response.data;
       setProducts(prev => [...prev, newProduct]);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create product');
@@ -49,11 +50,12 @@ export const useProducts = (): UseProductsState & UseProductsActions => {
     }
   };
 
-  const updateProduct = async (id: string, updates: Partial<Product>) => {
+  const updateProduct = async (id: string, updates: any) => {
     setLoading(true);
     setError(null);
     try {
-      const updatedProduct = await productService.updateProduct(id, updates);
+      const response = await productService.updateProduct(id, updates);
+      const updatedProduct = response.data;
       setProducts(prev => 
         prev.map(product => 
           product.id === id ? updatedProduct : product
@@ -85,8 +87,8 @@ export const useProducts = (): UseProductsState & UseProductsActions => {
     setLoading(true);
     setError(null);
     try {
-      const data = await productService.searchProducts(query);
-      setProducts(data);
+      const response = await productService.searchProducts(query);
+      setProducts(response.data || []);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to search products');
     } finally {
@@ -98,8 +100,8 @@ export const useProducts = (): UseProductsState & UseProductsActions => {
     setLoading(true);
     setError(null);
     try {
-      const data = await productService.filterProducts(filters);
-      setProducts(data);
+      const response = await productService.getProducts(filters);
+      setProducts(response.data || []);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to filter products');
     } finally {

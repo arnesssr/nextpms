@@ -27,6 +27,9 @@ export interface PriceHistory {
   change_type: PriceChangeType;
   changed_by: string;
   changed_at: string;
+  // Optional fields populated by joins
+  product_name?: string;
+  product_sku?: string;
 }
 
 export interface Discount {
@@ -162,6 +165,79 @@ export interface PricingAnalyticsResponse {
   products_with_low_margin: number;
   products_with_high_margin: number;
   recent_price_changes: number;
+}
+
+// Saved pricing calculations
+export interface SavedPricingCalculation {
+  id: string;
+  name: string;
+  description?: string;
+  calculation_type: 'single_product' | 'competitor_analysis' | 'bulk_pricing' | 'break_even';
+  input_data: CalculationInputData;
+  results: CalculationResults;
+  created_by: string;
+  created_at: string;
+  updated_at: string;
+  is_favorite?: boolean;
+  tags?: string[];
+  product_id?: string; // Optional link to specific product
+}
+
+export interface CalculationInputData {
+  // Single product inputs
+  cost_price?: number;
+  target_margin?: number;
+  overhead_percentage?: number;
+  
+  // Competitor analysis inputs
+  competitor_price?: number;
+  market_position?: 'premium' | 'competitive' | 'value';
+  
+  // Bulk pricing inputs
+  bulk_update_type?: 'margin' | 'markup' | 'cost_plus';
+  bulk_value?: number;
+  
+  // Break-even inputs
+  fixed_costs?: number;
+  variable_costs?: number;
+  
+  // Additional context
+  product_id?: string;
+  product_name?: string;
+  calculation_date: string;
+}
+
+export interface CalculationResults {
+  selling_price: number;
+  profit_margin: number;
+  markup_percentage: number;
+  profit_amount: number;
+  break_even_price?: number;
+  recommended_price?: number;
+  competitor_adjustment?: number;
+  total_cost_with_overhead?: number;
+  warnings: string[];
+  recommendations: string[];
+  is_valid_margin: boolean;
+}
+
+export interface SaveCalculationRequest {
+  name: string;
+  description?: string;
+  calculation_type: 'single_product' | 'competitor_analysis' | 'bulk_pricing' | 'break_even';
+  input_data: CalculationInputData;
+  results: CalculationResults;
+  is_favorite?: boolean;
+  tags?: string[];
+  product_id?: string; // Optional link to specific product
+}
+
+export interface CalculationComparison {
+  id: string;
+  name: string;
+  comparisons: SavedPricingCalculation[];
+  created_at: string;
+  created_by: string;
 }
 
 // Component props

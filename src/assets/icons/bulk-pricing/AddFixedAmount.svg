@@ -1,0 +1,40 @@
+<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <!-- Gradient for add operation -->
+    <linearGradient id="addGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#4facfe;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#00f2fe;stop-opacity:1" />
+    </linearGradient>
+    
+    <!-- Background gradient -->
+    <linearGradient id="addBg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#667eea;stop-opacity:0.1" />
+      <stop offset="100%" style="stop-color:#764ba2;stop-opacity:0.1" />
+    </linearGradient>
+    
+    <!-- Currency gradient -->
+    <linearGradient id="currencyGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#a8edea;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#fed6e3;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  
+  <!-- Background circle -->
+  <circle cx="12" cy="12" r="11" fill="url(#addBg)" stroke="url(#addGradient)" stroke-width="1" opacity="0.8"/>
+  
+  <!-- Currency symbol base -->
+  <rect x="8" y="8" width="8" height="8" rx="2" fill="url(#currencyGradient)" opacity="0.7"/>
+  
+  <!-- Plus sign -->
+  <path d="M12 9 L12 15" stroke="#ffffff" stroke-width="3" stroke-linecap="round"/>
+  <path d="M9 12 L15 12" stroke="#ffffff" stroke-width="3" stroke-linecap="round"/>
+  
+  <!-- Geometric accent -->
+  <circle cx="18" cy="6" r="2" fill="url(#addGradient)" opacity="0.6"/>
+  <path d="M18 5 L18 7" stroke="#ffffff" stroke-width="1" stroke-linecap="round"/>
+  <path d="M17 6 L19 6" stroke="#ffffff" stroke-width="1" stroke-linecap="round"/>
+  
+  <!-- Currency lines -->
+  <path d="M4 8 L8 10" stroke="url(#addGradient)" stroke-width="1.5" opacity="0.5" stroke-linecap="round"/>
+  <path d="M16 14 L20 16" stroke="url(#addGradient)" stroke-width="1.5" opacity="0.5" stroke-linecap="round"/>
+</svg>

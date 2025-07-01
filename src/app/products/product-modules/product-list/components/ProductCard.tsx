@@ -1,14 +1,14 @@
 // ProductCard.tsx
 import React from 'react';
 import { Eye, Edit, Trash2, Package } from 'lucide-react';
-import { Product } from '../../product-catalog/types';
+import { ProductWithCategory } from '@/types/products';
 import { formatProductData } from '../services/formatProductData';
 
 interface ProductCardProps {
-  product: Product;
-  onEdit?: (product: Product) => void;
+  product: ProductWithCategory;
+  onEdit?: (product: ProductWithCategory) => void;
   onDelete?: (productId: string) => void;
-  onView?: (product: Product) => void;
+  onView?: (product: ProductWithCategory) => void;
   viewMode?: 'grid' | 'list';
 }
 
@@ -34,9 +34,9 @@ const ProductCard: React.FC<ProductCardProps> = ({
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-4">
             <div className="flex-shrink-0">
-              {product.images && product.images.length > 0 ? (
+              {(product.gallery_images && product.gallery_images.length > 0) || product.featured_image_url ? (
                 <img 
-                  src={product.images[0]} 
+                  src={product.featured_image_url || product.gallery_images?.[0]} 
                   alt={product.name}
                   className="h-12 w-12 rounded-lg object-cover"
                 />
@@ -123,9 +123,9 @@ const ProductCard: React.FC<ProductCardProps> = ({
       </div>
       
       <div className="flex justify-center mb-4">
-        {product.images && product.images.length > 0 ? (
+        {(product.gallery_images && product.gallery_images.length > 0) || product.featured_image_url ? (
           <img 
-            src={product.images[0]} 
+            src={product.featured_image_url || product.gallery_images?.[0]} 
             alt={product.name}
             className="h-32 w-32 rounded-lg object-cover"
           />
@@ -147,7 +147,7 @@ const ProductCard: React.FC<ProductCardProps> = ({
             <p className={`text-sm ${stockStatus.color}`}>{stockStatus.text}</p>
           </div>
           <div className="text-right">
-            <p className="text-sm text-gray-500">Stock: {product.current_stock}</p>
+            <p className="text-sm text-gray-500">Stock: {product.stock_quantity || 0}</p>
           </div>
         </div>
       </div>

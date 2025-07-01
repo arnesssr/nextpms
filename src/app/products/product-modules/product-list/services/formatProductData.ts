@@ -1,23 +1,57 @@
 // formatProductData.ts
-import { Product, ProductStatus } from '../../product-catalog/types';
+import { ProductWithCategory } from '@/types/products';
+
+type ProductStatus = 'draft' | 'published' | 'archived';
+type LegacyProduct = {
+  id: string;
+  name: string;
+  description: string;
+  sku: string;
+  price?: number; // Legacy field
+  selling_price?: number;
+  base_price?: number;
+  current_stock?: number;
+  stock_quantity?: number;
+  minimum_stock?: number;
+  min_stock_level?: number;
+  status: string;
+  created_at: string;
+  images?: string[]; // Legacy field
+  gallery_images?: string[];
+  featured_image_url?: string;
+  category_id?: string;
+};
 
 export class ProductDataFormatter {
-  static formatPrice(price: number, currency = 'USD'): string {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency,
-    }).format(price);
+  static formatPrice(price: number | null | undefined, currency = 'USD'): string {
+    // Handle null, undefined, or NaN values
+    if (price == null || isNaN(price) || price < 0) {
+      return '$0.00';
+    }
+    
+    try {
+      return new Intl.NumberFormat('en-US', {
+        style: 'currency',
+        currency,
+      }).format(price);
+    } catch (error) {
+      console.warn('Error formatting price:', error);
+      return '$0.00';
+    }
   }
 
-  static formatStock(current: number, minimum: number): {
+  static formatStock(current: number | null | undefined, minimum: number | null | undefined): {
     level: 'out' | 'low' | 'normal';
     text: string;
     color: string;
   } {
-    if (current === 0) {
+    const currentStock = current ?? 0;
+    const minimumStock = minimum ?? 0;
+    
+    if (currentStock === 0) {
       return { level: 'out', text: 'Out of Stock', color: 'text-red-600' };
     }
-    if (current <= minimum) {
+    if (currentStock <= minimumStock) {
       return { level: 'low', text: 'Low Stock', color: 'text-yellow-600' };
     }
     return { level: 'normal', text: 'In Stock', color: 'text-green-600' };
@@ -29,34 +63,24 @@ export class ProductDataFormatter {
     bgColor: string;
   } {
     const statusConfig = {
-      active: {
-        text: 'Active',
+      published: {
+        text: 'Published',
         color: 'text-green-800',
         bgColor: 'bg-green-100'
       },
-      inactive: {
-        text: 'Inactive',
+      draft: {
+        text: 'Draft',
         color: 'text-gray-800',
         bgColor: 'bg-gray-100'
       },
-      discontinued: {
-        text: 'Discontinued',
+      archived: {
+        text: 'Archived',
         color: 'text-red-800',
         bgColor: 'bg-red-100'
-      },
-      out_of_stock: {
-        text: 'Out of Stock',
-        color: 'text-orange-800',
-        bgColor: 'bg-orange-100'
-      },
-      pending: {
-        text: 'Pending',
-        color: 'text-blue-800',
-        bgColor: 'bg-blue-100'
       }
     };
 
-    return statusConfig[status] || statusConfig.inactive;
+    return statusConfig[status] || statusConfig.draft;
   }
 
   static formatDate(dateString: string): string {
@@ -71,16 +95,17 @@ export class ProductDataFormatter {
     return `${weight} ${unit}`;
   }
 
-  static formatDimensions(dimensions?: Product['dimensions']): string {
+  static formatDimensions(dimensions?: { length?: number; width?: number; height?: number; unit?: string }): string {
     if (!dimensions) return 'N/A';
     
     const { length, width, height, unit } = dimensions;
     if (!length || !width || !height) return 'N/A';
     
-    return `${length} × ${width} × ${height} ${unit}`;
+    return `${length} × ${width} × ${height} ${unit || 'cm'}`;
   }
 
-  static formatSKU(sku: string): string {
+  static formatSKU(sku: string | null | undefined): string {
+    if (!sku) return 'N/A';
     return sku.toUpperCase();
   }
 
@@ -108,12 +133,17 @@ export class ProductDataFormatter {
     return tags.join(', ');
   }
 
+  static formatCategory(category?: { name: string; slug: string } | null): string {
+    if (!category || !category.name) return 'Uncategorized';
+    return category.name;
+  }
+
   static calculateDiscountPercentage(originalPrice: number, salePrice: number): number {
     if (originalPrice <= 0) return 0;
     return Math.round(((originalPrice - salePrice) / originalPrice) * 100);
   }
 
-  static formatProductCard(product: Product): {
+  static formatProductCard(product: ProductWithCategory | LegacyProduct): {
     formattedPrice: string;
     stockStatus: ReturnType<typeof ProductDataFormatter.formatStock>;
     statusInfo: ReturnType<typeof ProductDataFormatter.formatStatus>;
@@ -122,37 +152,74 @@ export class ProductDataFormatter {
     formattedSKU: string;
     formattedDate: string;
   } {
+    // Handle different price field names and get the best available price
+    const getPrice = (prod: any) => {
+      if (prod.selling_price != null && !isNaN(prod.selling_price)) {
+        return prod.selling_price;
+      }
+      if (prod.price != null && !isNaN(prod.price)) {
+        return prod.price;
+      }
+      if (prod.base_price != null && !isNaN(prod.base_price)) {
+        return prod.base_price;
+      }
+      return 0;
+    };
+    
+    // Handle different stock field names
+    const getCurrentStock = (prod: any) => {
+      if (prod.current_stock != null) return prod.current_stock;
+      if (prod.stock_quantity != null) return prod.stock_quantity;
+      return 0;
+    };
+    
+    const getMinimumStock = (prod: any) => {
+      if (prod.minimum_stock != null) return prod.minimum_stock;
+      if (prod.min_stock_level != null) return prod.min_stock_level;
+      return 0;
+    };
+    
+    // Handle different status formats
+    const getStatus = (prod: any): ProductStatus => {
+      const status = prod.status;
+      if (status === 'published' || status === 'active') return 'published';
+      if (status === 'draft' || status === 'inactive') return 'draft';
+      if (status === 'archived' || status === 'discontinued') return 'archived';
+      return 'draft';
+    };
+    
     return {
-      formattedPrice: this.formatPrice(product.price),
-      stockStatus: this.formatStock(product.current_stock, product.minimum_stock),
-      statusInfo: this.formatStatus(product.status),
-      initials: this.generateProductInitials(product.name),
-      shortDescription: this.truncateDescription(product.description),
+      formattedPrice: this.formatPrice(getPrice(product)),
+      stockStatus: this.formatStock(getCurrentStock(product), getMinimumStock(product)),
+      statusInfo: this.formatStatus(getStatus(product)),
+      initials: this.generateProductInitials(product.name || 'Unknown'),
+      shortDescription: this.truncateDescription(product.description || 'No description available'),
       formattedSKU: this.formatSKU(product.sku),
       formattedDate: this.formatDate(product.created_at),
     };
   }
 
-  static sortProducts(products: Product[], sortBy: string, sortOrder: 'asc' | 'desc' = 'asc'): Product[] {
+  static sortProducts(products: (ProductWithCategory | LegacyProduct)[], sortBy: string, sortOrder: 'asc' | 'desc' = 'asc'): (ProductWithCategory | LegacyProduct)[] {
     return [...products].sort((a, b) => {
       let aValue: any, bValue: any;
 
       switch (sortBy) {
         case 'name':
-          aValue = a.name.toLowerCase();
-          bValue = b.name.toLowerCase();
+          aValue = (a.name || '').toLowerCase();
+          bValue = (b.name || '').toLowerCase();
           break;
         case 'price':
-          aValue = a.price;
-          bValue = b.price;
+          // Use selling_price first, then fallback to price or base_price
+          aValue = a.selling_price ?? a.price ?? a.base_price ?? 0;
+          bValue = b.selling_price ?? b.price ?? b.base_price ?? 0;
           break;
         case 'stock':
-          aValue = a.current_stock;
-          bValue = b.current_stock;
+          aValue = a.current_stock ?? a.stock_quantity ?? 0;
+          bValue = b.current_stock ?? b.stock_quantity ?? 0;
           break;
         case 'created_at':
-          aValue = new Date(a.created_at);
-          bValue = new Date(b.created_at);
+          aValue = new Date(a.created_at || 0);
+          bValue = new Date(b.created_at || 0);
           break;
         default:
           return 0;
@@ -164,17 +231,17 @@ export class ProductDataFormatter {
     });
   }
 
-  static filterProducts(products: Product[], filters: Record<string, any>): Product[] {
+  static filterProducts(products: (ProductWithCategory | LegacyProduct)[], filters: Record<string, any>): (ProductWithCategory | LegacyProduct)[] {
     return products.filter(product => {
       // Search filter
       if (filters.search) {
         const searchTerm = filters.search.toLowerCase();
-        const searchableText = `${product.name} ${product.description} ${product.sku}`.toLowerCase();
+        const searchableText = `${product.name || ''} ${product.description || ''} ${product.sku || ''}`.toLowerCase();
         if (!searchableText.includes(searchTerm)) return false;
       }
 
       // Category filter
-      if (filters.category && product.category !== filters.category) {
+      if (filters.category && product.category_id !== filters.category) {
         return false;
       }
 
@@ -184,15 +251,18 @@ export class ProductDataFormatter {
       }
 
       // Price range filter
-      if (filters.minPrice && product.price < filters.minPrice) {
+      const productPrice = product.selling_price ?? product.price ?? product.base_price ?? 0;
+      if (filters.minPrice && productPrice < filters.minPrice) {
         return false;
       }
-      if (filters.maxPrice && product.price > filters.maxPrice) {
+      if (filters.maxPrice && productPrice > filters.maxPrice) {
         return false;
       }
 
       // Low stock filter
-      if (filters.lowStock && product.current_stock > product.minimum_stock) {
+      const currentStock = product.current_stock ?? product.stock_quantity ?? 0;
+      const minimumStock = product.minimum_stock ?? product.min_stock_level ?? 0;
+      if (filters.lowStock && currentStock > minimumStock) {
         return false;
       }
 

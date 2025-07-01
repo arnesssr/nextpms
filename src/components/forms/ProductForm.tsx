@@ -19,11 +19,26 @@ import {
   DollarSign,
   Package,
   Tag,
-  FileText
+  FileText,
+  Star,
+  Edit2,
+  Trash2,
+  Download,
+  Eye,
+  MoreVertical
 } from 'lucide-react';
 import { Product } from '@/types';
 import { useCategories } from '@/app/categories/category-modules/category-management/hooks/useCategories';
 import { ProductService as productService } from '@/services/products';
+import { useMediaUpload } from '@/app/products/product-modules/media-management/hooks/useMediaUpload';
+import { toast } from 'sonner';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { Progress } from '@/components/ui/progress';
 
 // Form validation schema
 const productSchema = z.object({
@@ -57,9 +72,25 @@ interface ProductFormProps {
 export function ProductForm({ product, onClose, onSuccess }: ProductFormProps) {
   const [images, setImages] = useState<string[]>(product?.images || []);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<{ [key: string]: number }>({});
+  const [currentProductId, setCurrentProductId] = useState<string | null>(product?.id || null);
+  
 
   // Fetch real categories from the backend
   const { categories, loading: categoriesLoading } = useCategories();
+  
+  // Use media management hooks when we have a product ID
+  const {
+    media,
+    loading: mediaLoading,
+    uploading,
+    fetchMedia,
+    uploadMedia,
+    deleteMedia,
+    updateMedia,
+    setPrimaryImage
+  } = useMediaUpload(currentProductId);
 
   const {
     register,
@@ -103,15 +134,107 @@ export function ProductForm({ product, onClose, onSuccess }: ProductFormProps) {
     }
   }, [watchedValues.name, watchedValues.sku, product, setValue]);
 
-  const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+  // Enhanced image upload with progress tracking
+  const handleImageUpload = async (files: FileList | File[]) => {
+    if (!currentProductId) {
+      toast.error("Please save the product before uploading images.");
+      return;
+    }
+
+    const fileArray = Array.from(files);
+    
+    for (const file of fileArray) {
+      const fileId = `${file.name}-${Date.now()}`;
+      setUploadProgress(prev => ({ ...prev, [fileId]: 0 }));
+      
+      try {
+        // Simulate upload progress
+        const uploadInterval = setInterval(() => {
+          setUploadProgress(prev => {
+            const currentProgress = prev[fileId] || 0;
+            if (currentProgress >= 90) {
+              clearInterval(uploadInterval);
+              return prev;
+            }
+            return { ...prev, [fileId]: currentProgress + 10 };
+          });
+        }, 200);
+        
+        await uploadMedia(file);
+        
+        clearInterval(uploadInterval);
+        setUploadProgress(prev => ({ ...prev, [fileId]: 100 }));
+        
+        // Remove progress after completion
+        setTimeout(() => {
+          setUploadProgress(prev => {
+            const { [fileId]: removed, ...rest } = prev;
+            return rest;
+          });
+        }, 1000);
+        
+        toast.success(`${file.name} has been uploaded successfully.`);
+      } catch (error) {
+        setUploadProgress(prev => {
+          const { [fileId]: removed, ...rest } = prev;
+          return rest;
+        });
+        
+        toast.error(`Failed to upload ${file.name}. Please try again.`);
+      }
+    }
+  };
+
+  const handleFileInputChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files;
-    if (files) {
-      // In a real app, you'd upload to Cloudinary or similar service
-      // For now, we'll just create mock URLs
-      const newImages = Array.from(files).map((file, index) => 
-        `https://via.placeholder.com/300x200?text=${encodeURIComponent(file.name)}`
+    if (files && files.length > 0) {
+      handleImageUpload(files);
+    }
+  };
+
+  const handleDrop = (event: React.DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    setIsDragging(false);
+    
+    const files = event.dataTransfer.files;
+    if (files && files.length > 0) {
+      const imageFiles = Array.from(files).filter(file => 
+        file.type.startsWith('image/')
       );
-      setImages(prev => [...prev, ...newImages]);
+      
+      if (imageFiles.length > 0) {
+        handleImageUpload(imageFiles);
+      } else {
+        toast.error("Please upload only image files.");
+      }
+    }
+  };
+
+  const handleDragOver = (event: React.DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = (event: React.DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    setIsDragging(false);
+  };
+
+  const handleDeleteMedia = async (mediaId: string) => {
+    try {
+      await deleteMedia(mediaId);
+      toast.success("The image has been deleted successfully.");
+    } catch (error) {
+      toast.error("Failed to delete the image. Please try again.");
+    }
+  };
+
+  const handleSetPrimary = async (mediaId: string) => {
+    try {
+      await setPrimaryImage(mediaId);
+      toast.success("The primary image has been updated.");
+    } catch (error) {
+      toast.error("Failed to set primary image. Please try again.");
     }
   };
 
@@ -152,8 +275,19 @@ export function ProductForm({ product, onClose, onSuccess }: ProductFormProps) {
       }
       
       if (result.success) {
+        // Set the product ID for media management if this was a new product
+        if (!product?.id && result.data?.id) {
+          setCurrentProductId(result.data.id);
+        }
+        
         onSuccess?.(result.data);
-        onClose();
+        
+        // Only close if this is an update, not a new product creation
+        if (product?.id) {
+          onClose();
+        } else {
+          toast.success("Product created successfully! You can now upload images.");
+        }
       } else {
         throw new Error(result.error || 'Failed to save product');
       }
@@ -363,64 +497,163 @@ export function ProductForm({ product, onClose, onSuccess }: ProductFormProps) {
           </CardContent>
         </Card>
 
-        {/* Images */}
+        {/* Product Media Management */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center">
               <ImageIcon className="mr-2 h-5 w-5" />
-              Product Images
+              Product Media
             </CardTitle>
             <CardDescription>
-              Upload images for your product (up to 5 images)
+              {currentProductId 
+                ? "Upload and manage images for your product"
+                : "Save the product first to upload images"
+              }
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            {/* Image Upload */}
-            <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
-              <input
-                type="file"
-                id="images"
-                multiple
-                accept="image/*"
-                onChange={handleImageUpload}
-                className="hidden"
-              />
-              <label htmlFor="images" className="cursor-pointer">
-                <Upload className="mx-auto h-12 w-12 text-gray-400" />
-                <p className="mt-2 text-sm text-gray-600">
-                  Click to upload or drag and drop
-                </p>
-                <p className="text-xs text-gray-500">
-                  PNG, JPG, GIF up to 10MB each
-                </p>
-              </label>
-            </div>
-
-            {/* Image Preview */}
-            {images.length > 0 && (
-              <div className="grid grid-cols-3 gap-4">
-                {images.map((image, index) => (
-                  <div key={index} className="relative group">
-                    <img
-                      src={image}
-                      alt={`Product image ${index + 1}`}
-                      className="w-full h-24 object-cover rounded-lg border"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => removeImage(index)}
-                      className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
-                    >
-                      <X className="h-3 w-3" />
-                    </button>
-                    {index === 0 && (
-                      <Badge className="absolute bottom-1 left-1 text-xs">
-                        Primary
-                      </Badge>
-                    )}
-                  </div>
-                ))}
+            {!currentProductId ? (
+              <div className="text-center py-8 text-gray-500">
+                <ImageIcon className="mx-auto h-12 w-12 mb-4 text-gray-300" />
+                <p>Please save the product first to enable media uploads</p>
               </div>
+            ) : (
+              <>
+                {/* Enhanced Upload Area */}
+                <div 
+                  className={`border-2 border-dashed rounded-lg p-6 text-center transition-colors ${
+                    isDragging 
+                      ? 'border-primary bg-primary/5' 
+                      : uploading 
+                        ? 'border-yellow-400 bg-yellow-50'
+                        : 'border-gray-300 hover:border-gray-400'
+                  }`}
+                  onDrop={handleDrop}
+                  onDragOver={handleDragOver}
+                  onDragLeave={handleDragLeave}
+                >
+                  <input
+                    type="file"
+                    id="media-upload"
+                    multiple
+                    accept="image/*"
+                    onChange={handleFileInputChange}
+                    className="hidden"
+                    disabled={uploading}
+                  />
+                  <label htmlFor="media-upload" className={`cursor-pointer ${uploading ? 'cursor-not-allowed' : ''}`}>
+                    <Upload className={`mx-auto h-12 w-12 mb-4 ${
+                      isDragging ? 'text-primary' : uploading ? 'text-yellow-500' : 'text-gray-400'
+                    }`} />
+                    <p className="text-sm font-medium mb-2">
+                      {isDragging 
+                        ? 'Drop files here...' 
+                        : uploading 
+                          ? 'Uploading...' 
+                          : 'Click to upload or drag and drop'
+                      }
+                    </p>
+                    <p className="text-xs text-gray-500">
+                      PNG, JPG, GIF up to 10MB each
+                    </p>
+                  </label>
+                  
+                  {/* Upload Progress */}
+                  {Object.entries(uploadProgress).map(([fileId, progress]) => (
+                    <div key={fileId} className="mt-4">
+                      <div className="flex justify-between text-sm mb-1">
+                        <span>Uploading...</span>
+                        <span>{progress}%</span>
+                      </div>
+                      <Progress value={progress} className="h-2" />
+                    </div>
+                  ))}
+                </div>
+
+                {/* Media Gallery */}
+                {mediaLoading ? (
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                    {Array.from({ length: 3 }).map((_, i) => (
+                      <div key={i} className="aspect-square bg-gray-200 rounded-lg animate-pulse" />
+                    ))}
+                  </div>
+                ) : media && media.length > 0 ? (
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                    {media.map((item) => (
+                      <div key={item.id} className="relative group aspect-square">
+                        <img
+                          src={item.url}
+                          alt={item.alt_text || 'Product image'}
+                          className="w-full h-full object-cover rounded-lg border transition-transform group-hover:scale-105"
+                        />
+                        
+                        {/* Primary Badge */}
+                        {item.is_primary && (
+                          <Badge className="absolute top-2 left-2 bg-yellow-500 text-white">
+                            <Star className="w-3 h-3 mr-1" />
+                            Primary
+                          </Badge>
+                        )}
+                        
+                        {/* Action Menu */}
+                        <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="secondary" size="sm" className="h-8 w-8 p-0">
+                                <MoreVertical className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              {!item.is_primary && (
+                                <DropdownMenuItem onClick={() => handleSetPrimary(item.id)}>
+                                  <Star className="w-4 h-4 mr-2" />
+                                  Set as Primary
+                                </DropdownMenuItem>
+                              )}
+                              <DropdownMenuItem onClick={() => window.open(item.url, '_blank')}>
+                                <Eye className="w-4 h-4 mr-2" />
+                                View Full Size
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => {
+                                const link = document.createElement('a');
+                                link.href = item.url;
+                                link.download = item.filename || 'image';
+                                link.click();
+                              }}>
+                                <Download className="w-4 h-4 mr-2" />
+                                Download
+                              </DropdownMenuItem>
+                              <DropdownMenuItem 
+                                onClick={() => handleDeleteMedia(item.id)}
+                                className="text-red-600"
+                              >
+                                <Trash2 className="w-4 h-4 mr-2" />
+                                Delete
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </div>
+                        
+                        {/* File Info Overlay */}
+                        <div className="absolute bottom-0 left-0 right-0 bg-black/50 text-white p-2 rounded-b-lg opacity-0 group-hover:opacity-100 transition-opacity">
+                          <p className="text-xs truncate">
+                            {item.filename || 'Unknown file'}
+                          </p>
+                          <p className="text-xs text-gray-300">
+                            {item.file_size ? `${(item.file_size / 1024 / 1024).toFixed(1)} MB` : 'Unknown size'}
+                          </p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-8 text-gray-500">
+                    <ImageIcon className="mx-auto h-12 w-12 mb-4 text-gray-300" />
+                    <p>No images uploaded yet</p>
+                    <p className="text-sm">Upload your first image to get started</p>
+                  </div>
+                )}
+              </>
             )}
           </CardContent>
         </Card>

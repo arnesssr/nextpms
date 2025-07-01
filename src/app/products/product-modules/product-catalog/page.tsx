@@ -94,11 +94,6 @@ export default function ProductCatalogPage() {
             <Settings className="mr-2 h-4 w-4" />
             Bulk Actions
           </Button>
-          
-          <Button onClick={handleCreateProduct}>
-            <Plus className="mr-2 h-4 w-4" />
-            Add Product
-          </Button>
         </div>
       </div>
 

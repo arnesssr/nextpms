@@ -1,0 +1,41 @@
+<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <!-- Gradient for reduce operation -->
+    <linearGradient id="reduceGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#ffecd2;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#fcb69f;stop-opacity:1" />
+    </linearGradient>
+    
+    <!-- Background gradient -->
+    <linearGradient id="reduceBg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#667eea;stop-opacity:0.1" />
+      <stop offset="100%" style="stop-color:#764ba2;stop-opacity:0.1" />
+    </linearGradient>
+    
+    <!-- Currency gradient -->
+    <linearGradient id="currencyReduceGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#a8edea;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#fed6e3;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  
+  <!-- Background circle -->
+  <circle cx="12" cy="12" r="11" fill="url(#reduceBg)" stroke="url(#reduceGradient)" stroke-width="1" opacity="0.8"/>
+  
+  <!-- Currency symbol base -->
+  <rect x="8" y="8" width="8" height="8" rx="2" fill="url(#currencyReduceGradient)" opacity="0.7"/>
+  
+  <!-- Minus sign -->
+  <path d="M9 12 L15 12" stroke="#ffffff" stroke-width="3" stroke-linecap="round"/>
+  
+  <!-- Geometric accent -->
+  <circle cx="6" cy="18" r="2" fill="url(#reduceGradient)" opacity="0.6"/>
+  <path d="M5 18 L7 18" stroke="#ffffff" stroke-width="1" stroke-linecap="round"/>
+  
+  <!-- Currency lines -->
+  <path d="M4 16 L8 14" stroke="url(#reduceGradient)" stroke-width="1.5" opacity="0.5" stroke-linecap="round"/>
+  <path d="M16 10 L20 8" stroke="url(#reduceGradient)" stroke-width="1.5" opacity="0.5" stroke-linecap="round"/>
+  
+  <!-- Reduction indicator -->
+  <path d="M18 6 L20 8 L18 10" stroke="url(#reduceGradient)" stroke-width="1.5" fill="none" opacity="0.6" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

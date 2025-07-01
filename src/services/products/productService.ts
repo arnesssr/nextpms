@@ -189,6 +189,11 @@ const productService = {
   // Delete product
   deleteProduct: async (id: string): Promise<{ success: boolean; message: string }> => {
     try {
+      // First, delete all associated media
+      const { ProductMediaService } = await import('./mediaService');
+      await ProductMediaService.deleteProductMedia(id);
+      
+      // Then delete the product
       const { error } = await supabase
         .from('products')
         .delete()

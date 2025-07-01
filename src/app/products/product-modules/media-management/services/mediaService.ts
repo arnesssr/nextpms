@@ -7,69 +7,41 @@ import {
   FileValidationResult,
   MediaValidationRules
 } from '../types';
+import { supabase } from '@/lib/supabaseClient';
 
-// Mock API base URL - replace with actual API
-const API_BASE = '/api/media';
+// Supabase Storage Configuration using environment variables
+const STORAGE_BUCKET = process.env.SUPABASE_S3_BUCKET_NAME || 'media-files';
+const STORAGE_URL_BASE = process.env.NEXT_PUBLIC_SUPABASE_URL;
+
+// Validate storage configuration
+if (!STORAGE_BUCKET || !STORAGE_URL_BASE) {
+  console.warn('Missing Supabase storage configuration. Using defaults.');
+}
 
 export const mediaService = {
   // Get media files for a specific product
   async getProductMedia(productId: string): Promise<MediaFile[]> {
     try {
-      // Mock implementation - replace with actual API call
-      const mockMediaFiles: MediaFile[] = [
-        {
-          id: '1',
-          product_id: productId,
-          file_name: 'wireless-headphones-main.jpg',
-          original_name: 'headphones-photo.jpg',
-          file_type: 'image/jpeg',
-          file_size: 245760, // 240KB
-          file_url: 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=500&h=500&fit=crop',
-          thumbnail_url: 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=150&h=150&fit=crop',
-          alt_text: 'Wireless headphones main product image',
-          is_primary: true,
-          sort_order: 1,
-          uploaded_by: 'admin',
-          uploaded_at: '2024-01-15T10:30:00Z',
-          updated_at: '2024-01-15T10:30:00Z'
-        },
-        {
-          id: '2',
-          product_id: productId,
-          file_name: 'wireless-headphones-side.jpg',
-          original_name: 'headphones-side-view.jpg',
-          file_type: 'image/jpeg',
-          file_size: 198432, // 194KB
-          file_url: 'https://images.unsplash.com/photo-1583394838336-acd977736f90?w=500&h=500&fit=crop',
-          thumbnail_url: 'https://images.unsplash.com/photo-1583394838336-acd977736f90?w=150&h=150&fit=crop',
-          alt_text: 'Wireless headphones side view',
-          is_primary: false,
-          sort_order: 2,
-          uploaded_by: 'admin',
-          uploaded_at: '2024-01-15T10:32:00Z',
-          updated_at: '2024-01-15T10:32:00Z'
-        },
-        {
-          id: '3',
-          product_id: productId,
-          file_name: 'wireless-headphones-detail.jpg',
-          original_name: 'headphones-detail.jpg',
-          file_type: 'image/jpeg',
-          file_size: 312576, // 305KB
-          file_url: 'https://images.unsplash.com/photo-1484704849700-f032a568e944?w=500&h=500&fit=crop',
-          thumbnail_url: 'https://images.unsplash.com/photo-1484704849700-f032a568e944?w=150&h=150&fit=crop',
-          alt_text: 'Wireless headphones detail shot',
-          is_primary: false,
-          sort_order: 3,
-          uploaded_by: 'admin',
-          uploaded_at: '2024-01-15T10:35:00Z',
-          updated_at: '2024-01-15T10:35:00Z'
-        }
-      ];
+      // Replace the mock implementation with actual API call to fetch media files from Supabase or other backend service.
+      const { data, error } = await supabase
+        .from('media')
+        .select('*')
+        .eq('product_id', productId);
 
-      // Simulate API delay (reduced for better UX)
-      await new Promise(resolve => setTimeout(resolve, 100));
-      return mockMediaFiles;
+      if (error) {
+        console.error('Error fetching media from database:', error);
+        console.error('Error details:', {
+          code: error.code,
+          message: error.message,
+          details: error.details,
+          hint: error.hint
+        });
+        throw error; // Throw the original error so we can see the details
+      }
+
+      // Transform database fields to match frontend MediaFile interface
+      const transformedData = (data || []).map(item => mediaService.transformDbToMediaFile(item));
+      return transformedData;
     } catch (error) {
       console.error('Error fetching product media:', error);
       throw new Error('Failed to fetch product media');
@@ -80,7 +52,7 @@ export const mediaService = {
   async uploadMedia(request: MediaUploadRequest): Promise<MediaFile[]> {
     try {
       // Validate files first
-      const validationResults = request.files.map(file => this.validateFile(file));
+      const validationResults = request.files.map(file => mediaService.validateFile(file));
       const invalidFiles = validationResults.filter(result => !result.isValid);
       
       if (invalidFiles.length > 0) {
@@ -88,26 +60,67 @@ export const mediaService = {
         throw new Error(`File validation failed: ${errors.join(', ')}`);
       }
 
-      // Mock implementation - replace with actual API call
-      const uploadedFiles: MediaFile[] = request.files.map((file, index) => ({
-        id: (Date.now() + index).toString(),
-        product_id: request.product_id,
-        file_name: `${request.product_id}-${Date.now()}-${index}.${file.name.split('.').pop()}`,
-        original_name: file.name,
-        file_type: file.type,
-        file_size: file.size,
-        file_url: URL.createObjectURL(file), // Mock URL - replace with actual upload
-        thumbnail_url: URL.createObjectURL(file), // Mock thumbnail
-        alt_text: request.alt_texts?.[index] || `${file.name} for product ${request.product_id}`,
-        is_primary: request.is_primary_indices?.includes(index) || false,
-        sort_order: index + 1,
-        uploaded_by: 'current_user',
-        uploaded_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
-      }));
+      const uploadedFiles: MediaFile[] = [];
 
-      // Simulate upload delay
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      // Upload each file to Supabase storage and create database records
+      for (let index = 0; index < request.files.length; index++) {
+        const file = request.files[index];
+        const fileExt = mediaService.getFileExtension(file.type);
+        const fileName = `${request.product_id}-${Date.now()}-${index}.${fileExt}`;
+        const filePath = `products/${request.product_id}/${fileName}`;
+
+        // Upload file to Supabase Storage using correct bucket name
+        const { data: storageData, error: storageError } = await supabase.storage
+          .from(STORAGE_BUCKET)
+          .upload(filePath, file);
+
+        if (storageError) {
+          console.error('Error uploading to storage:', storageError);
+          throw new Error(`Failed to upload ${file.name}: ${storageError.message}`);
+        }
+
+        // Get public URL for the uploaded file
+        const { data: urlData } = supabase.storage
+          .from(STORAGE_BUCKET)
+          .getPublicUrl(filePath);
+
+        // Create database record using correct schema mapping
+        const mediaRecord = {
+          product_id: request.product_id,
+          file_name: fileName,
+          file_path: filePath, // Database uses file_path, not storage_path
+          bucket_name: STORAGE_BUCKET,
+          file_size: file.size,
+          mime_type: file.type,
+          file_extension: fileExt,
+          alt_text: request.alt_texts?.[index] || `${file.name} for product ${request.product_id}`,
+          media_type: mediaService.getMediaType(file.type),
+          usage_type: 'product_gallery' as const,
+          is_primary: request.is_primary_indices?.includes(index) || false,
+          display_order: index + 1, // Database uses display_order, not sort_order
+          is_active: true,
+          visibility: 'public' as const,
+          created_by: 'system', // Will be updated with proper user ID later
+        };
+
+        const { data: dbData, error: dbError } = await supabase
+          .from('media')
+          .insert(mediaRecord)
+          .select()
+          .single();
+
+        if (dbError) {
+          console.error('Error creating media record:', dbError);
+          // Clean up uploaded file on database error
+          await supabase.storage.from(STORAGE_BUCKET).remove([filePath]);
+          throw new Error(`Failed to create media record for ${file.name}: ${dbError.message}`);
+        }
+
+        // Transform database record to MediaFile interface before adding to results
+        const transformedFile = mediaService.transformDbToMediaFile(dbData);
+        uploadedFiles.push(transformedFile);
+      }
+
       return uploadedFiles;
     } catch (error) {
       console.error('Error uploading media:', error);
@@ -118,23 +131,32 @@ export const mediaService = {
   // Update media metadata
   async updateMedia(request: MediaUpdateRequest): Promise<MediaFile> {
     try {
-      // Mock implementation - replace with actual API call
-      const currentMedia = await this.getMediaById(request.id);
-      if (!currentMedia) {
+      const updateData: any = {};
+      
+      if (request.alt_text !== undefined) updateData.alt_text = request.alt_text;
+      if (request.is_primary !== undefined) updateData.is_primary = request.is_primary;
+      if (request.sort_order !== undefined) updateData.display_order = request.sort_order; // Database uses display_order
+      
+      updateData.updated_at = new Date().toISOString();
+
+      const { data, error } = await supabase
+        .from('media')
+        .update(updateData)
+        .eq('id', request.id)
+        .select()
+        .single();
+
+      if (error) {
+        console.error('Error updating media:', error);
+        throw new Error(`Failed to update media: ${error.message}`);
+      }
+
+      if (!data) {
         throw new Error('Media file not found');
       }
 
-      const updatedMedia: MediaFile = {
-        ...currentMedia,
-        alt_text: request.alt_text ?? currentMedia.alt_text,
-        is_primary: request.is_primary ?? currentMedia.is_primary,
-        sort_order: request.sort_order ?? currentMedia.sort_order,
-        updated_at: new Date().toISOString()
-      };
-
-      // Simulate API delay
-      await new Promise(resolve => setTimeout(resolve, 400));
-      return updatedMedia;
+      // Transform database record to MediaFile interface before returning
+      return mediaService.transformDbToMediaFile(data);
     } catch (error) {
       console.error('Error updating media:', error);
       throw new Error('Failed to update media');
@@ -144,17 +166,40 @@ export const mediaService = {
   // Delete media file
   async deleteMedia(mediaId: string): Promise<void> {
     try {
-      // Mock implementation - replace with actual API call
-      const response = await fetch(`${API_BASE}/${mediaId}`, {
-        method: 'DELETE'
-      });
+      // First, get the media record to retrieve file path for storage deletion
+      const { data: mediaRecord, error: fetchError } = await supabase
+        .from('media')
+        .select('file_path, bucket_name')
+        .eq('id', mediaId)
+        .single();
 
-      if (!response.ok) {
-        throw new Error('Failed to delete media file');
+      if (fetchError) {
+        console.error('Error fetching media for deletion:', fetchError);
+        throw new Error('Failed to find media file for deletion');
       }
 
-      // Simulate API delay
-      await new Promise(resolve => setTimeout(resolve, 600));
+      // Delete from storage first
+      if (mediaRecord?.file_path) {
+        const { error: storageError } = await supabase.storage
+          .from(mediaRecord.bucket_name || STORAGE_BUCKET)
+          .remove([mediaRecord.file_path]);
+
+        if (storageError) {
+          console.warn('Warning: Failed to delete file from storage:', storageError);
+          // Continue with database deletion even if storage deletion fails
+        }
+      }
+
+      // Delete database record
+      const { error } = await supabase
+        .from('media')
+        .delete()
+        .eq('id', mediaId);
+
+      if (error) {
+        console.error('Error deleting media from database:', error);
+        throw new Error('Failed to delete media file from database');
+      }
     } catch (error) {
       console.error('Error deleting media:', error);
       throw new Error('Failed to delete media file');
@@ -164,28 +209,23 @@ export const mediaService = {
   // Get media by ID
   async getMediaById(mediaId: string): Promise<MediaFile | null> {
     try {
-      // Mock implementation - replace with actual API call
-      // This would typically fetch from your database
-      const mockMedia: MediaFile = {
-        id: mediaId,
-        product_id: '1',
-        file_name: 'sample-file.jpg',
-        original_name: 'sample.jpg',
-        file_type: 'image/jpeg',
-        file_size: 245760,
-        file_url: 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=500&h=500&fit=crop',
-        thumbnail_url: 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=150&h=150&fit=crop',
-        alt_text: 'Sample image',
-        is_primary: false,
-        sort_order: 1,
-        uploaded_by: 'admin',
-        uploaded_at: '2024-01-15T10:30:00Z',
-        updated_at: '2024-01-15T10:30:00Z'
-      };
+      const { data, error } = await supabase
+        .from('media')
+        .select('*')
+        .eq('id', mediaId)
+        .single();
 
-      // Simulate API delay
-      await new Promise(resolve => setTimeout(resolve, 300));
-      return mockMedia;
+      if (error) {
+        console.error('Error fetching media by ID:', error);
+        throw new Error('Failed to fetch media by ID');
+      }
+
+      if (!data) {
+        return null;
+      }
+
+      // Transform database record to MediaFile interface
+      return mediaService.transformDbToMediaFile(data);
     } catch (error) {
       console.error('Error fetching media by ID:', error);
       return null;
@@ -195,21 +235,14 @@ export const mediaService = {
   // Bulk operations on media
   async bulkMediaOperation(request: BulkMediaRequest): Promise<void> {
     try {
-      // Mock implementation - replace with actual API call
-      const response = await fetch(`${API_BASE}/bulk`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(request),
-      });
+      // Perform bulk operation logic on media
+      const { data, error } = await supabase
+        .rpc('bulk_media_operation', request);
 
-      if (!response.ok) {
-        throw new Error('Failed to perform bulk operation');
+      if (error) {
+        console.error('Error performing bulk operation:', error);
+        throw new Error('Failed to perform bulk media operation');
       }
-
-      // Simulate API delay
-      await new Promise(resolve => setTimeout(resolve, 1000));
     } catch (error) {
       console.error('Error performing bulk operation:', error);
       throw new Error('Failed to perform bulk media operation');
@@ -219,25 +252,16 @@ export const mediaService = {
   // Get media statistics
   async getMediaStats(): Promise<MediaStats> {
     try {
-      // Mock implementation - replace with actual API call
-      const mockStats: MediaStats = {
-        total_files: 156,
-        total_size: 52428800, // 50MB
-        by_type: {
-          'image/jpeg': 89,
-          'image/png': 34,
-          'image/webp': 23,
-          'video/mp4': 8,
-          'application/pdf': 2
-        },
-        recent_uploads: 12,
-        storage_used: 52428800, // 50MB
-        storage_limit: 1073741824 // 1GB
-      };
+      // Fetch media statistics from Supabase
+      const { data, error } = await supabase
+        .rpc('get_media_stats');
 
-      // Simulate API delay
-      await new Promise(resolve => setTimeout(resolve, 400));
-      return mockStats;
+      if (error) {
+        console.error('Error fetching media statistics:', error);
+        throw new Error('Failed to fetch media statistics');
+      }
+
+      return data;
     } catch (error) {
       console.error('Error fetching media stats:', error);
       throw new Error('Failed to fetch media statistics');
@@ -259,7 +283,7 @@ export const mediaService = {
 
     // Check file size
     if (file.size > validationRules.maxFileSize) {
-      errors.push(`File size exceeds maximum allowed size of ${this.formatFileSize(validationRules.maxFileSize)}`);
+      errors.push(`File size exceeds maximum allowed size of ${mediaService.formatFileSize(validationRules.maxFileSize)}`);
     }
 
     // Check file type
@@ -323,5 +347,54 @@ export const mediaService = {
     };
     
     return mimeToExt[mimeType] || 'unknown';
+  },
+
+  // Get media type from MIME type
+  getMediaType(mimeType: string): 'image' | 'document' | 'video' | 'audio' | 'other' {
+    if (mimeType.startsWith('image/')) return 'image';
+    if (mimeType.startsWith('video/')) return 'video';
+    if (mimeType.startsWith('audio/')) return 'audio';
+    if (mimeType.includes('pdf') || mimeType.includes('document') || mimeType.includes('text')) return 'document';
+    return 'other';
+  },
+
+  // Transform database record to MediaFile interface
+  transformDbToMediaFile(dbRecord: any): MediaFile {
+    // Generate public URL from storage path
+    const { data: urlData } = supabase.storage
+      .from(dbRecord.bucket_name || STORAGE_BUCKET)
+      .getPublicUrl(dbRecord.file_path);
+
+    return {
+      id: dbRecord.id,
+      product_id: dbRecord.product_id,
+      file_name: dbRecord.file_name,
+      original_name: dbRecord.file_name, // Database doesn't store original name separately
+      file_type: dbRecord.mime_type || 'unknown',
+      file_size: dbRecord.file_size || 0,
+      file_url: urlData.publicUrl,
+      thumbnail_url: mediaService.isImageFile(dbRecord.mime_type || '') 
+        ? mediaService.generateThumbnailUrl(urlData.publicUrl) 
+        : urlData.publicUrl,
+      alt_text: dbRecord.alt_text || '',
+      is_primary: dbRecord.is_primary || false,
+      sort_order: dbRecord.display_order || 0,
+      uploaded_by: dbRecord.created_by || 'system',
+      uploaded_at: dbRecord.created_at,
+      updated_at: dbRecord.updated_at,
+      // Additional fields from database
+      bucket_name: dbRecord.bucket_name,
+      storage_path: dbRecord.file_path,
+      mime_type: dbRecord.mime_type,
+      file_extension: dbRecord.file_extension,
+      media_type: dbRecord.media_type,
+      usage_type: dbRecord.usage_type,
+      is_active: dbRecord.is_active,
+      is_featured: dbRecord.is_featured,
+      visibility: dbRecord.visibility,
+      tags: dbRecord.tags,
+      description: dbRecord.description,
+      caption: dbRecord.caption,
+    };
   }
 };
