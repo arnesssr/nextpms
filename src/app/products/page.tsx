@@ -6,6 +6,7 @@ import { SidebarLayout } from '@/components/layout/Sidebar';
 import { ProductModuleTabs } from './components/ProductModuleTabs';
 import { useProducts } from './product-modules/product-list/hooks/useProducts';
 import { ProductForm } from '@/components/forms/ProductForm';
+import { ImportExportDialog } from '@/components/dialogs/ImportExportDialog';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { 
@@ -19,7 +20,8 @@ export default function ProductsPage() {
   const router = useRouter();
   const [isProductFormOpen, setIsProductFormOpen] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
-  const { products } = useProducts();
+  const [isImportExportOpen, setIsImportExportOpen] = useState(false);
+  const { products, fetchProducts } = useProducts();
 
   const handleEditProduct = (product: Product) => {
     setSelectedProduct(product);
@@ -120,11 +122,17 @@ export default function ProductsPage() {
               </p>
             </div>
             <div className="flex space-x-2">
-              <Button variant="outline">
+              <Button 
+                variant="outline"
+                onClick={() => setIsImportExportOpen(true)}
+              >
                 <Upload className="mr-2 h-4 w-4" />
                 Import
               </Button>
-              <Button variant="outline">
+              <Button 
+                variant="outline"
+                onClick={() => setIsImportExportOpen(true)}
+              >
                 <Download className="mr-2 h-4 w-4" />
                 Export
               </Button>
@@ -134,8 +142,8 @@ export default function ProductsPage() {
               </Button>
               {/* Sheet for editing existing products */}
               <Sheet open={isProductFormOpen} onOpenChange={setIsProductFormOpen}>
-                <SheetContent className="w-[600px] sm:w-[700px]">
-                  <SheetHeader>
+                <SheetContent className="w-full sm:w-[90vw] md:w-[80vw] lg:w-[70vw] xl:w-[60vw] max-w-4xl overflow-y-auto">
+                  <SheetHeader className="sticky top-0 bg-white z-10 pb-4 border-b">
                     <SheetTitle>
                       Edit Product
                     </SheetTitle>
@@ -143,12 +151,24 @@ export default function ProductsPage() {
                       Update product information and settings
                     </SheetDescription>
                   </SheetHeader>
-                  <ProductForm 
-                    product={selectedProduct} 
-                    onClose={handleFormClose}
-                  />
+                  <div className="py-6">
+                    <ProductForm 
+                      product={selectedProduct} 
+                      onClose={handleFormClose}
+                    />
+                  </div>
                 </SheetContent>
               </Sheet>
+              
+              {/* Import/Export Dialog */}
+              <ImportExportDialog 
+                open={isImportExportOpen}
+                onOpenChange={setIsImportExportOpen}
+                onImportComplete={() => {
+                  // Refresh products after import
+                  fetchProducts();
+                }}
+              />
             </div>
           </div>
 

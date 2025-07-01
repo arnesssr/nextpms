@@ -1,253 +1,252 @@
-import { useState, useCallback } from 'react';
-import { MediaFile, MediaUpload, MediaUploadRequest, MediaStats } from '../types';
-import { mediaService } from '../services/mediaService';
+'use client';
 
-interface UseMediaUploadState {
+import { useState, useEffect, useCallback } from 'react';
+import { ProductMediaService } from '@/services/products/mediaService';
+import { Media, MediaUploadRequest, MediaType } from '@/types/media';
+
+// Utility function to generate Supabase storage URLs
+function generateSupabaseUrl(bucketName: string, filePath: string): string {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  return `${supabaseUrl}/storage/v1/object/public/${bucketName}/${filePath}`;
+}
+
+export interface MediaFile extends Media {
+  // Additional properties if needed
+}
+
+interface UseMediaUploadReturn {
+  media: MediaFile[];
   mediaFiles: MediaFile[];
-  currentUploads: MediaUpload[];
-  uploadProgress: number;
-  stats: MediaStats | null;
   loading: boolean;
+  uploading: boolean;
   error: string | null;
-}
-
-interface UseMediaUploadActions {
-  uploadFiles: (files: File[], productId: string, options?: { altTexts?: string[]; primaryIndices?: number[] }) => Promise<void>;
-  updateMedia: (mediaId: string, updates: { alt_text?: string; is_primary?: boolean; sort_order?: number }) => Promise<void>;
-  deleteMedia: (mediaId: string) => Promise<void>;
+  fetchMedia: () => Promise<void>;
   fetchProductMedia: (productId: string) => Promise<void>;
-  fetchMediaStats: () => Promise<void>;
-  clearUploads: () => void;
-  retryUpload: (uploadIndex: number) => Promise<void>;
+  uploadMedia: (file: File, metadata?: Partial<MediaUploadRequest>) => Promise<Media>;
+  deleteMedia: (mediaId: string) => Promise<void>;
+  updateMedia: (mediaId: string, updates: Partial<Media>) => Promise<void>;
+  setPrimaryImage: (mediaId: string) => Promise<void>;
 }
 
-export const useMediaUpload = (): UseMediaUploadState & UseMediaUploadActions => {
-  const [mediaFiles, setMediaFiles] = useState<MediaFile[]>([]);
-  const [currentUploads, setCurrentUploads] = useState<MediaUpload[]>([]);
-  const [uploadProgress, setUploadProgress] = useState(0);
-  const [stats, setStats] = useState<MediaStats | null>(null);
+export function useMediaUpload(productId?: string | null): UseMediaUploadReturn {
+  const [media, setMedia] = useState<MediaFile[]>([]);
   const [loading, setLoading] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchProductMedia = useCallback(async (productId: string) => {
+  // Fetch media for the current product
+  const fetchMedia = useCallback(async () => {
+    if (!productId) {
+      setMedia([]);
+      return;
+    }
+
     setLoading(true);
     setError(null);
+
     try {
-      const media = await mediaService.getProductMedia(productId);
-      setMediaFiles(media.sort((a, b) => a.sort_order - b.sort_order));
+      const response = await ProductMediaService.getProductMedia(productId);
+      
+      if (response.success && response.data) {
+        setMedia(response.data as MediaFile[]);
+      } else {
+        setError(response.error?.message || 'Failed to fetch media');
+        setMedia([]);
+      }
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to fetch media';
-      setError(errorMessage);
-      console.error('Error fetching product media:', err);
+      setError(err instanceof Error ? err.message : 'Unknown error occurred');
+      setMedia([]);
     } finally {
       setLoading(false);
     }
-  }, []); // No dependencies needed as it only uses setState functions
+  }, [productId]);
 
-  const uploadFiles = useCallback(async (
-    files: File[], 
-    productId: string, 
-    options?: { altTexts?: string[]; primaryIndices?: number[] }
-  ) => {
+  // Alias for fetchMedia to match MediaManagementTab usage
+  const fetchProductMedia = useCallback(async (id: string) => {
+    if (!id) return;
+    
     setLoading(true);
     setError(null);
-    
-    // Create upload tracking objects
-    const uploads: MediaUpload[] = files.map((file, index) => ({
-      file,
-      preview_url: URL.createObjectURL(file),
-      upload_progress: 0,
-      status: 'pending'
-    }));
-    
-    setCurrentUploads(uploads);
 
     try {
-      // Update upload status to uploading
-      setCurrentUploads(prev => 
-        prev.map(upload => ({ ...upload, status: 'uploading' as const }))
-      );
-
-      // Simulate upload progress (less frequent updates for smoother UX)
-      const progressInterval = setInterval(() => {
-        setCurrentUploads(prev => 
-          prev.map(upload => ({
-            ...upload,
-            upload_progress: Math.min(upload.upload_progress + Math.random() * 10, 95)
-          }))
-        );
-        
-        setUploadProgress(prev => Math.min(prev + Math.random() * 8, 95));
-      }, 500); // Reduced frequency from 200ms to 500ms
-
-      // Prepare upload request
-      const uploadRequest: MediaUploadRequest = {
-        product_id: productId,
-        files,
-        alt_texts: options?.altTexts,
-        is_primary_indices: options?.primaryIndices
-      };
-
-      // Upload files
-      const uploadedFiles = await mediaService.uploadMedia(uploadRequest);
+      const response = await ProductMediaService.getProductMedia(id);
       
-      // Clear progress interval
-      clearInterval(progressInterval);
+      if (response.success && response.data) {
+        setMedia(response.data as MediaFile[]);
+      } else {
+        setError(response.error?.message || 'Failed to fetch media');
+        setMedia([]);
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unknown error occurred');
+      setMedia([]);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  // Upload media
+  const uploadMedia = useCallback(async (
+    file: File, 
+    metadata: Partial<MediaUploadRequest> = {}
+  ): Promise<Media> => {
+    if (!productId) {
+      throw new Error('Product ID is required for media upload');
+    }
+
+    setUploading(true);
+    setError(null);
+
+    try {
+      // Determine media type from file
+      const mediaType: MediaType = file.type.startsWith('image/') ? 'image' : 
+                                   file.type.startsWith('video/') ? 'video' :
+                                   file.type.startsWith('audio/') ? 'audio' :
+                                   file.type.includes('pdf') || file.type.includes('document') ? 'document' : 'other';
+
+      // Create form data for upload
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('media_type', mediaType);
+      formData.append('usage_type', metadata.usage_type || 'product_gallery');
+      formData.append('is_primary', String(metadata.is_primary || false));
       
-      // Update upload status to completed
-      setCurrentUploads(prev => 
-        prev.map(upload => ({ 
-          ...upload, 
-          status: 'completed' as const,
-          upload_progress: 100
-        }))
-      );
-      setUploadProgress(100);
+      if (metadata.alt_text) {
+        formData.append('alt_text', metadata.alt_text);
+      }
+      if (metadata.caption) {
+        formData.append('caption', metadata.caption);
+      }
+      if (metadata.description) {
+        formData.append('description', metadata.description);
+      }
 
-      // Add uploaded files to media files list
-      setMediaFiles(prev => [...prev, ...uploadedFiles].sort((a, b) => a.sort_order - b.sort_order));
+      // Upload via API route
+      const response = await fetch(`/api/products/${productId}/media`, {
+        method: 'POST',
+        body: formData,
+      });
 
-      // Clear uploads after a short delay
-      setTimeout(() => {
-        setCurrentUploads([]);
-        setUploadProgress(0);
-      }, 2000);
+      if (!response.ok) {
+        throw new Error(`Upload failed with status: ${response.status}`);
+      }
 
-      // Refresh stats
-      await fetchMediaStats();
-
+      const result = await response.json();
+      
+      if (result.success && result.media) {
+        // Refresh media list
+        await fetchMedia();
+        return result.media;
+      } else {
+        throw new Error(result.error || 'Upload failed');
+      }
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Upload failed';
       setError(errorMessage);
-      
-      // Update upload status to error
-      setCurrentUploads(prev => 
-        prev.map(upload => ({ 
-          ...upload, 
-          status: 'error' as const,
-          error_message: errorMessage
-        }))
-      );
-      
-      console.error('Error uploading files:', err);
-      throw err;
+      throw new Error(errorMessage);
     } finally {
-      setLoading(false);
+      setUploading(false);
     }
-  }, []);
+  }, [productId, fetchMedia]);
 
-  const updateMedia = useCallback(async (
-    mediaId: string, 
-    updates: { alt_text?: string; is_primary?: boolean; sort_order?: number }
-  ) => {
-    setLoading(true);
-    setError(null);
-    try {
-      const updatedMedia = await mediaService.updateMedia({ id: mediaId, ...updates });
-      
-      setMediaFiles(prev => 
-        prev.map(media => 
-          media.id === mediaId ? updatedMedia : media
-        ).sort((a, b) => a.sort_order - b.sort_order)
-      );
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to update media';
-      setError(errorMessage);
-      throw err;
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
+  // Delete media
   const deleteMedia = useCallback(async (mediaId: string) => {
-    setLoading(true);
     setError(null);
+
     try {
-      await mediaService.deleteMedia(mediaId);
-      
-      setMediaFiles(prev => prev.filter(media => media.id !== mediaId));
-      
-      // Refresh stats
-      await fetchMediaStats();
+      // For now, we'll implement a basic delete by calling the API directly
+      // This would need to be implemented in the ProductMediaService
+      const response = await fetch(`/api/media/${mediaId}`, {
+        method: 'DELETE',
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to delete media');
+      }
+
+      // Refresh media list
+      await fetchMedia();
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to delete media';
+      const errorMessage = err instanceof Error ? err.message : 'Delete failed';
       setError(errorMessage);
-      throw err;
-    } finally {
-      setLoading(false);
+      throw new Error(errorMessage);
     }
-  }, []);
+  }, [fetchMedia]);
 
-  const fetchMediaStats = useCallback(async () => {
-    try {
-      const mediaStats = await mediaService.getMediaStats();
-      setStats(mediaStats);
-    } catch (err) {
-      console.error('Error fetching media stats:', err);
-    }
-  }, []);
-
-  const clearUploads = () => {
-    setCurrentUploads([]);
-    setUploadProgress(0);
+  // Update media
+  const updateMedia = useCallback(async (mediaId: string, updates: Partial<Media>) => {
     setError(null);
-  };
 
-  const retryUpload = async (uploadIndex: number) => {
-    const upload = currentUploads[uploadIndex];
-    if (!upload) return;
-
-    setCurrentUploads(prev => 
-      prev.map((u, index) => 
-        index === uploadIndex 
-          ? { ...u, status: 'pending', upload_progress: 0, error_message: undefined }
-          : u
-      )
-    );
-
-    // This would retry the specific upload
-    // For now, we'll simulate a retry
     try {
-      setCurrentUploads(prev => 
-        prev.map((u, index) => 
-          index === uploadIndex ? { ...u, status: 'uploading' } : u
-        )
-      );
+      // For now, we'll implement a basic update by calling the API directly
+      // This would need to be implemented in the ProductMediaService
+      const response = await fetch(`/api/media/${mediaId}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(updates),
+      });
 
-      // Simulate retry upload
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      setCurrentUploads(prev => 
-        prev.map((u, index) => 
-          index === uploadIndex 
-            ? { ...u, status: 'completed', upload_progress: 100 }
-            : u
-        )
-      );
+      if (!response.ok) {
+        throw new Error('Failed to update media');
+      }
+
+      // Refresh media list
+      await fetchMedia();
     } catch (err) {
-      setCurrentUploads(prev => 
-        prev.map((u, index) => 
-          index === uploadIndex 
-            ? { ...u, status: 'error', error_message: 'Retry failed' }
-            : u
-        )
-      );
+      const errorMessage = err instanceof Error ? err.message : 'Update failed';
+      setError(errorMessage);
+      throw new Error(errorMessage);
     }
-  };
+  }, [fetchMedia]);
+
+  // Set primary image
+  const setPrimaryImage = useCallback(async (mediaId: string) => {
+    if (!productId) {
+      throw new Error('Product ID is required');
+    }
+
+    setError(null);
+
+    try {
+      const response = await ProductMediaService.setProductPrimaryImage(productId, mediaId);
+      
+      if (response.success) {
+        // Update the product's featured image
+        await ProductMediaService.updateProductFeaturedImage(productId);
+        // Refresh media list
+        await fetchMedia();
+      } else {
+        throw new Error(response.error?.message || 'Failed to set primary image');
+      }
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to set primary image';
+      setError(errorMessage);
+      throw new Error(errorMessage);
+    }
+  }, [productId, fetchMedia]);
+
+  // Fetch media when productId changes
+  useEffect(() => {
+    if (productId) {
+      fetchMedia();
+    } else {
+      setMedia([]);
+    }
+  }, [productId, fetchMedia]);
 
   return {
-    mediaFiles,
-    currentUploads,
-    uploadProgress,
-    stats,
+    media,
+    mediaFiles: media, // Alias for MediaManagementTab compatibility
     loading,
+    uploading,
     error,
-    uploadFiles,
-    updateMedia,
-    deleteMedia,
+    fetchMedia,
     fetchProductMedia,
-    fetchMediaStats,
-    clearUploads,
-    retryUpload,
+    uploadMedia,
+    deleteMedia,
+    updateMedia,
+    setPrimaryImage,
   };
-};
+}

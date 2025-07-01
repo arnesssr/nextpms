@@ -138,6 +138,45 @@ export class ProductDataFormatter {
     return category.name;
   }
 
+  static generateImageUrl(bucketName: string, filePath: string): string {
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    return `${supabaseUrl}/storage/v1/object/public/${bucketName}/${filePath}`;
+  }
+
+  static processProductMedia(media?: any[]): {
+    primaryImage: string | null;
+    galleryImages: string[];
+    hasImages: boolean;
+  } {
+    if (!media || !Array.isArray(media) || media.length === 0) {
+      return {
+        primaryImage: null,
+        galleryImages: [],
+        hasImages: false
+      };
+    }
+
+    // Find primary image first
+    const primaryMedia = media.find(m => m.is_primary === true);
+    const primaryImage = primaryMedia 
+      ? this.generateImageUrl(primaryMedia.bucket_name || 'media-files', primaryMedia.file_path)
+      : null;
+
+    // Generate all image URLs
+    const galleryImages = media
+      .filter(m => m.file_path) // Only media with valid file paths
+      .map(m => this.generateImageUrl(m.bucket_name || 'media-files', m.file_path));
+
+    // If no primary image, use the first available image
+    const effectivePrimaryImage = primaryImage || (galleryImages.length > 0 ? galleryImages[0] : null);
+
+    return {
+      primaryImage: effectivePrimaryImage,
+      galleryImages,
+      hasImages: galleryImages.length > 0
+    };
+  }
+
   static calculateDiscountPercentage(originalPrice: number, salePrice: number): number {
     if (originalPrice <= 0) return 0;
     return Math.round(((originalPrice - salePrice) / originalPrice) * 100);
@@ -151,6 +190,9 @@ export class ProductDataFormatter {
     shortDescription: string;
     formattedSKU: string;
     formattedDate: string;
+    primaryImage: string | null;
+    galleryImages: string[];
+    hasImages: boolean;
   } {
     // Handle different price field names and get the best available price
     const getPrice = (prod: any) => {
@@ -188,6 +230,9 @@ export class ProductDataFormatter {
       return 'draft';
     };
     
+    // Process media data (for products with media relationship)
+    const mediaData = this.processProductMedia((product as any).media);
+    
     return {
       formattedPrice: this.formatPrice(getPrice(product)),
       stockStatus: this.formatStock(getCurrentStock(product), getMinimumStock(product)),
@@ -196,6 +241,9 @@ export class ProductDataFormatter {
       shortDescription: this.truncateDescription(product.description || 'No description available'),
       formattedSKU: this.formatSKU(product.sku),
       formattedDate: this.formatDate(product.created_at),
+      primaryImage: mediaData.primaryImage,
+      galleryImages: mediaData.galleryImages,
+      hasImages: mediaData.hasImages,
     };
   }
 

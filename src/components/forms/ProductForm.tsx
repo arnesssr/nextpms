@@ -69,12 +69,26 @@ interface ProductFormProps {
   onSuccess?: (product: Product) => void;
 }
 
+// Interface for pending uploads
+interface PendingUpload {
+  id: string;
+  file: File;
+  preview: string;
+  progress: number;
+  status: 'pending' | 'uploading' | 'completed' | 'error';
+}
+
 export function ProductForm({ product, onClose, onSuccess }: ProductFormProps) {
   const [images, setImages] = useState<string[]>(product?.images || []);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<{ [key: string]: number }>({});
   const [currentProductId, setCurrentProductId] = useState<string | null>(product?.id || null);
+  const [pendingUploads, setPendingUploads] = useState<PendingUpload[]>([]);
+  const [isProcessingPending, setIsProcessingPending] = useState(false);
+  const [uploadQueue, setUploadQueue] = useState<{[key: string]: number}>({});
+  const [totalUploads, setTotalUploads] = useState(0);
+  const [completedUploads, setCompletedUploads] = useState(0);
   
 
   // Fetch real categories from the backend
@@ -134,15 +148,70 @@ export function ProductForm({ product, onClose, onSuccess }: ProductFormProps) {
     }
   }, [watchedValues.name, watchedValues.sku, product, setValue]);
 
+  // Process pending uploads when product ID becomes available
+  useEffect(() => {
+    const processPendingUploads = async () => {
+      if (currentProductId && pendingUploads.length > 0 && !isProcessingPending) {
+        setIsProcessingPending(true);
+        
+        toast.info(`Processing ${pendingUploads.length} pending upload(s)...`);
+        
+        for (const pending of pendingUploads) {
+          try {
+            // Update status to uploading
+            setPendingUploads(prev => prev.map(p => 
+              p.id === pending.id ? { ...p, status: 'uploading' } : p
+            ));
+            
+            await uploadMedia(pending.file);
+            
+            // Update status to completed
+            setPendingUploads(prev => prev.map(p => 
+              p.id === pending.id ? { ...p, status: 'completed', progress: 100 } : p
+            ));
+            
+            toast.success(`${pending.file.name} uploaded successfully.`);
+          } catch (error) {
+            // Update status to error
+            setPendingUploads(prev => prev.map(p => 
+              p.id === pending.id ? { ...p, status: 'error' } : p
+            ));
+            
+            toast.error(`Failed to upload ${pending.file.name}.`);
+          }
+        }
+        
+        // Clear completed and error uploads after a delay
+        setTimeout(() => {
+          setPendingUploads(prev => prev.filter(p => p.status === 'pending'));
+          setIsProcessingPending(false);
+        }, 2000);
+      }
+    };
+
+    processPendingUploads();
+  }, [currentProductId, pendingUploads, isProcessingPending, uploadMedia]);
+
   // Enhanced image upload with progress tracking
   const handleImageUpload = async (files: FileList | File[]) => {
+    const fileArray = Array.from(files);
+    
     if (!currentProductId) {
-      toast.error("Please save the product before uploading images.");
+      // Store files as pending uploads
+      const newPendingUploads: PendingUpload[] = fileArray.map(file => ({
+        id: `${file.name}-${Date.now()}-${Math.random()}`,
+        file,
+        preview: URL.createObjectURL(file),
+        progress: 0,
+        status: 'pending' as const
+      }));
+      
+      setPendingUploads(prev => [...prev, ...newPendingUploads]);
+      toast.info(`${fileArray.length} file(s) prepared for upload. They will be uploaded once the product is saved.`);
       return;
     }
 
-    const fileArray = Array.from(files);
-    
+    // Upload immediately if product exists
     for (const file of fileArray) {
       const fileId = `${file.name}-${Date.now()}`;
       setUploadProgress(prev => ({ ...prev, [fileId]: 0 }));
@@ -304,78 +373,102 @@ export function ProductForm({ product, onClose, onSuccess }: ProductFormProps) {
   };
 
   return (
-    <div className="space-y-6 mt-6">
-      <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+    <div className="max-h-full">
+      <form onSubmit={handleSubmit(onSubmit)} className="space-y-6 max-h-full">
         {/* Basic Information */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center">
-              <FileText className="mr-2 h-5 w-5" />
+        <Card className="border-l-4 border-l-blue-500 shadow-sm">
+          <CardHeader className="bg-gradient-to-r from-blue-50 to-indigo-50">
+            <CardTitle className="flex items-center text-blue-900">
+              <FileText className="mr-2 h-5 w-5 text-blue-600" />
               Basic Information
             </CardTitle>
-            <CardDescription>
+            <CardDescription className="text-blue-700">
               Enter the basic details for your product
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="name">Product Name *</Label>
+            <div className="space-y-3">
+              <Label htmlFor="name" className="text-sm font-semibold text-gray-700 block">
+                Product Name *
+              </Label>
               <Input
                 id="name"
                 {...register('name')}
-                placeholder="Enter product name"
+                placeholder="Enter a descriptive product name"
+                className="h-12 text-base border-2 border-gray-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all duration-200 bg-white shadow-sm"
               />
               {errors.name && (
-                <p className="text-sm text-red-600">{errors.name.message}</p>
+                <p className="text-sm text-red-600 font-medium flex items-center mt-1">
+                  <span className="mr-1">⚠️</span>
+                  {errors.name.message}
+                </p>
               )}
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="description">Description *</Label>
+            <div className="space-y-3">
+              <Label htmlFor="description" className="text-sm font-semibold text-gray-700 block">
+                Description *
+              </Label>
               <Textarea
                 id="description"
                 {...register('description')}
-                placeholder="Enter product description"
+                placeholder="Describe your product features, benefits, and specifications..."
                 rows={4}
+                className="min-h-[100px] text-base border-2 border-gray-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all duration-200 bg-white shadow-sm resize-y"
               />
               {errors.description && (
-                <p className="text-sm text-red-600">{errors.description.message}</p>
+                <p className="text-sm text-red-600 font-medium flex items-center mt-1">
+                  <span className="mr-1">⚠️</span>
+                  {errors.description.message}
+                </p>
               )}
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="sku">SKU</Label>
+            <div className="grid grid-cols-2 gap-6">
+              <div className="space-y-3">
+                <Label htmlFor="sku" className="text-sm font-semibold text-gray-700 block">
+                  SKU <span className="text-gray-500 font-normal">(Auto-generated)</span>
+                </Label>
                 <Input
                   id="sku"
                   {...register('sku')}
-                  placeholder="Auto-generated"
+                  placeholder="Will be generated automatically"
+                  className="h-11 text-base border-2 border-gray-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all duration-200 bg-gray-50 shadow-sm"
+                  readOnly
                 />
                 {errors.sku && (
-                  <p className="text-sm text-red-600">{errors.sku.message}</p>
+                  <p className="text-sm text-red-600 font-medium flex items-center mt-1">
+                    <span className="mr-1">⚠️</span>
+                    {errors.sku.message}
+                  </p>
                 )}
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="category_id">Category *</Label>
+              <div className="space-y-3">
+                <Label htmlFor="category_id" className="text-sm font-semibold text-gray-700 block">
+                  Category *
+                </Label>
                 <Select 
                   value={watchedValues.category_id} 
                   onValueChange={(value) => setValue('category_id', value)}
                   disabled={categoriesLoading}
                 >
-                  <SelectTrigger>
-                    <SelectValue placeholder={categoriesLoading ? "Loading categories..." : "Select category"} />
+                  <SelectTrigger className="h-11 text-base border-2 border-gray-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all duration-200 bg-white shadow-sm">
+                    <SelectValue placeholder={categoriesLoading ? "Loading categories..." : "Choose a product category"} />
                   </SelectTrigger>
                   <SelectContent>
                     {categories.map((category) => (
-                      <SelectItem key={category.id} value={category.id}>
+                      <SelectItem key={category.id} value={category.id} className="text-base py-2">
                         {category.name}
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
                 {errors.category_id && (
-                  <p className="text-sm text-red-600">{errors.category_id.message}</p>
+                  <p className="text-sm text-red-600 font-medium flex items-center mt-1">
+                    <span className="mr-1">⚠️</span>
+                    {errors.category_id.message}
+                  </p>
                 )}
               </div>
             </div>
@@ -383,69 +476,84 @@ export function ProductForm({ product, onClose, onSuccess }: ProductFormProps) {
         </Card>
 
         {/* Pricing & Inventory */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center">
-              <DollarSign className="mr-2 h-5 w-5" />
+        <Card className="border-l-4 border-l-green-500 shadow-sm">
+          <CardHeader className="bg-gradient-to-r from-green-50 to-emerald-50">
+            <CardTitle className="flex items-center text-green-900">
+              <DollarSign className="mr-2 h-5 w-5 text-green-600" />
               Pricing & Inventory
             </CardTitle>
-            <CardDescription>
+            <CardDescription className="text-green-700">
               Set pricing and stock information
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="base_price">Base Price *</Label>
+            <div className="grid grid-cols-2 gap-6">
+              <div className="space-y-3">
+                <Label htmlFor="base_price" className="text-sm font-semibold text-gray-700 block">
+                  Base Price * <span className="text-gray-500 font-normal">(Cost)</span>
+                </Label>
                 <div className="relative">
-                  <DollarSign className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                  <DollarSign className="absolute left-4 top-1/2 transform -translate-y-1/2 h-5 w-5 text-green-600" />
                   <Input
                     id="base_price"
                     type="number"
                     step="0.01"
                     {...register('base_price', { valueAsNumber: true })}
                     placeholder="0.00"
-                    className="pl-10"
+                    className="h-12 text-base pl-12 border-2 border-gray-200 focus:border-green-500 focus:ring-2 focus:ring-green-200 transition-all duration-200 bg-white shadow-sm font-medium"
                   />
                 </div>
                 {errors.base_price && (
-                  <p className="text-sm text-red-600">{errors.base_price.message}</p>
+                  <p className="text-sm text-red-600 font-medium flex items-center mt-1">
+                    <span className="mr-1">⚠️</span>
+                    {errors.base_price.message}
+                  </p>
                 )}
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="selling_price">Selling Price *</Label>
+              <div className="space-y-3">
+                <Label htmlFor="selling_price" className="text-sm font-semibold text-gray-700 block">
+                  Selling Price * <span className="text-gray-500 font-normal">(Customer pays)</span>
+                </Label>
                 <div className="relative">
-                  <DollarSign className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                  <DollarSign className="absolute left-4 top-1/2 transform -translate-y-1/2 h-5 w-5 text-green-600" />
                   <Input
                     id="selling_price"
                     type="number"
                     step="0.01"
                     {...register('selling_price', { valueAsNumber: true })}
                     placeholder="0.00"
-                    className="pl-10"
+                    className="h-12 text-base pl-12 border-2 border-gray-200 focus:border-green-500 focus:ring-2 focus:ring-green-200 transition-all duration-200 bg-white shadow-sm font-medium"
                   />
                 </div>
                 {errors.selling_price && (
-                  <p className="text-sm text-red-600">{errors.selling_price.message}</p>
+                  <p className="text-sm text-red-600 font-medium flex items-center mt-1">
+                    <span className="mr-1">⚠️</span>
+                    {errors.selling_price.message}
+                  </p>
                 )}
               </div>
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="stock_quantity">Stock Quantity *</Label>
+            <div className="space-y-3">
+              <Label htmlFor="stock_quantity" className="text-sm font-semibold text-gray-700 block">
+                Stock Quantity * <span className="text-gray-500 font-normal">(Available units)</span>
+              </Label>
               <div className="relative">
-                <Package className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                <Package className="absolute left-4 top-1/2 transform -translate-y-1/2 h-5 w-5 text-green-600" />
                 <Input
                   id="stock_quantity"
                   type="number"
                   {...register('stock_quantity', { valueAsNumber: true })}
-                  placeholder="0"
-                  className="pl-10"
+                  placeholder="Enter stock quantity"
+                  className="h-12 text-base pl-12 border-2 border-gray-200 focus:border-green-500 focus:ring-2 focus:ring-green-200 transition-all duration-200 bg-white shadow-sm font-medium"
                 />
               </div>
               {errors.stock_quantity && (
-                <p className="text-sm text-red-600">{errors.stock_quantity.message}</p>
+                <p className="text-sm text-red-600 font-medium flex items-center mt-1">
+                  <span className="mr-1">⚠️</span>
+                  {errors.stock_quantity.message}
+                </p>
               )}
             </div>
 
@@ -462,30 +570,47 @@ export function ProductForm({ product, onClose, onSuccess }: ProductFormProps) {
         </Card>
 
         {/* Product Status */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center">
-              <Tag className="mr-2 h-5 w-5" />
+        <Card className="border-l-4 border-l-purple-500 shadow-sm">
+          <CardHeader className="bg-gradient-to-r from-purple-50 to-violet-50">
+            <CardTitle className="flex items-center text-purple-900">
+              <Tag className="mr-2 h-5 w-5 text-purple-600" />
               Product Status
             </CardTitle>
-            <CardDescription>
+            <CardDescription className="text-purple-700">
               Set the publication status of your product
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="status">Status *</Label>
+            <div className="space-y-3">
+              <Label htmlFor="status" className="text-sm font-semibold text-gray-700 block">
+                Publication Status *
+              </Label>
               <Select 
                 value={watchedValues.status} 
                 onValueChange={(value: 'draft' | 'published' | 'archived') => setValue('status', value)}
               >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select status" />
+                <SelectTrigger className="h-11 text-base border-2 border-gray-200 focus:border-purple-500 focus:ring-2 focus:ring-purple-200 transition-all duration-200 bg-white shadow-sm">
+                  <SelectValue placeholder="Choose publication status" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="draft">Draft</SelectItem>
-                  <SelectItem value="published">Published</SelectItem>
-                  <SelectItem value="archived">Archived</SelectItem>
+                  <SelectItem value="draft" className="text-base py-2">
+                    <div className="flex items-center">
+                      <div className="w-2 h-2 rounded-full bg-gray-400 mr-2"></div>
+                      Draft
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="published" className="text-base py-2">
+                    <div className="flex items-center">
+                      <div className="w-2 h-2 rounded-full bg-green-500 mr-2"></div>
+                      Published
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="archived" className="text-base py-2">
+                    <div className="flex items-center">
+                      <div className="w-2 h-2 rounded-full bg-orange-500 mr-2"></div>
+                      Archived
+                    </div>
+                  </SelectItem>
                 </SelectContent>
               </Select>
               <p className="text-sm text-muted-foreground">
@@ -498,26 +623,102 @@ export function ProductForm({ product, onClose, onSuccess }: ProductFormProps) {
         </Card>
 
         {/* Product Media Management */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center">
-              <ImageIcon className="mr-2 h-5 w-5" />
+        <Card className="border-l-4 border-l-orange-500 shadow-sm">
+          <CardHeader className="bg-gradient-to-r from-orange-50 to-amber-50">
+            <CardTitle className="flex items-center text-orange-900">
+              <ImageIcon className="mr-2 h-5 w-5 text-orange-600" />
               Product Media
+              {media && media.length > 0 && (
+                <Badge variant="secondary" className="ml-2 bg-orange-100 text-orange-800">
+                  {media.length} image{media.length !== 1 ? 's' : ''}
+                </Badge>
+              )}
             </CardTitle>
-            <CardDescription>
+            <CardDescription className="text-orange-700">
               {currentProductId 
-                ? "Upload and manage images for your product"
+                ? "Upload and manage multiple images for your product"
                 : "Save the product first to upload images"
               }
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            {!currentProductId ? (
-              <div className="text-center py-8 text-gray-500">
-                <ImageIcon className="mx-auto h-12 w-12 mb-4 text-gray-300" />
-                <p>Please save the product first to enable media uploads</p>
+            {/* Pending Uploads Display (shown even without product ID) */}
+            {pendingUploads.length > 0 && (
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-sm font-medium">Pending Uploads ({pendingUploads.length})</h4>
+                  {!currentProductId && (
+                    <Badge variant="outline" className="text-xs">
+                      Will upload after saving
+                    </Badge>
+                  )}
+                </div>
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                  {pendingUploads.map((pending) => (
+                    <div key={pending.id} className="relative">
+                      <div className="aspect-square rounded-lg overflow-hidden border-2 border-dashed border-gray-300 bg-gray-50">
+                        <img
+                          src={pending.preview}
+                          alt="Pending upload"
+                          className="w-full h-full object-cover"
+                        />
+                        
+                        {/* Status overlay */}
+                        <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
+                          {pending.status === 'pending' && (
+                            <Badge variant="secondary" className="text-xs">
+                              Pending
+                            </Badge>
+                          )}
+                          {pending.status === 'uploading' && (
+                            <Badge className="text-xs bg-blue-500">
+                              Uploading...
+                            </Badge>
+                          )}
+                          {pending.status === 'completed' && (
+                            <Badge className="text-xs bg-green-500">
+                              ✓ Uploaded
+                            </Badge>
+                          )}
+                          {pending.status === 'error' && (
+                            <Badge variant="destructive" className="text-xs">
+                              Error
+                            </Badge>
+                          )}
+                        </div>
+                        
+                        {/* Remove button for pending items */}
+                        {pending.status === 'pending' && (
+                          <Button
+                            type="button"
+                            variant="destructive"
+                            size="sm"
+                            className="absolute top-1 right-1 h-6 w-6 p-0"
+                            onClick={() => {
+                              URL.revokeObjectURL(pending.preview);
+                              setPendingUploads(prev => prev.filter(p => p.id !== pending.id));
+                            }}
+                          >
+                            <X className="h-3 w-3" />
+                          </Button>
+                        )}
+                      </div>
+                      
+                      <p className="mt-1 text-xs text-gray-600 truncate">
+                        {pending.file.name}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+                {!currentProductId && (
+                  <p className="text-sm text-muted-foreground">
+                    💡 These files will be automatically uploaded once you save the product.
+                  </p>
+                )}
               </div>
-            ) : (
+            )}
+            
+            {!currentProductId && pendingUploads.length === 0 ? (
               <>
                 {/* Enhanced Upload Area */}
                 <div 
@@ -654,16 +855,21 @@ export function ProductForm({ product, onClose, onSuccess }: ProductFormProps) {
                   </div>
                 )}
               </>
-            )}
+            ) : null}
           </CardContent>
         </Card>
 
         {/* Form Actions */}
-        <div className="flex items-center justify-between pt-6 border-t">
-          <Button type="button" variant="outline" onClick={onClose}>
+        <div className="flex items-center justify-between pt-6 border-t bg-gray-50 -mx-6 px-6 py-4 rounded-b-lg">
+          <Button 
+            type="button" 
+            variant="outline" 
+            onClick={onClose}
+            className="h-11 px-6 border-2 hover:bg-gray-100 transition-colors"
+          >
             Cancel
           </Button>
-          <div className="flex space-x-2">
+          <div className="flex space-x-3">
             <Button 
               type="button" 
               variant="outline" 
@@ -672,8 +878,9 @@ export function ProductForm({ product, onClose, onSuccess }: ProductFormProps) {
                 setValue('status', 'draft');
                 handleSubmit((data) => onSubmit(data, true))();
               }}
+              className="h-11 px-6 border-2 border-gray-300 text-gray-700 hover:bg-gray-100 transition-colors"
             >
-              Save as Draft
+              📝 Save as Draft
             </Button>
             <Button 
               type="button" 
@@ -682,8 +889,9 @@ export function ProductForm({ product, onClose, onSuccess }: ProductFormProps) {
                 setValue('status', 'published');
                 handleSubmit((data) => onSubmit(data, false))();
               }}
+              className="h-11 px-8 bg-blue-600 hover:bg-blue-700 text-white font-medium shadow-md transition-all duration-200"
             >
-              {isSubmitting ? 'Publishing...' : product ? 'Update & Publish' : 'Publish Product'}
+              {isSubmitting ? '⏳ Publishing...' : product ? '✅ Update & Publish' : '🚀 Publish Product'}
             </Button>
           </div>
         </div>

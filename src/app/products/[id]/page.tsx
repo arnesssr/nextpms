@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, use } from 'react';
 import { useRouter } from 'next/navigation';
 import { SidebarLayout } from '@/components/layout/Sidebar';
 import { Button } from '@/components/ui/button';
@@ -44,11 +44,12 @@ interface Product {
 }
 
 interface ProductDetailPageProps {
-  params: { id: string };
+  params: Promise<{ id: string }>;
 }
 
 export default function ProductDetailPage({ params }: ProductDetailPageProps) {
   const router = useRouter();
+  const resolvedParams = use(params);
   const [product, setProduct] = useState<Product | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -57,7 +58,7 @@ export default function ProductDetailPage({ params }: ProductDetailPageProps) {
     const fetchProduct = async () => {
       try {
         setLoading(true);
-        const response = await ProductService.getProduct(params.id);
+        const response = await ProductService.getProduct(resolvedParams.id);
         if (response.success) {
           setProduct(response.data);
         } else {
@@ -71,13 +72,13 @@ export default function ProductDetailPage({ params }: ProductDetailPageProps) {
       }
     };
 
-    if (params.id) {
+    if (resolvedParams.id) {
       fetchProduct();
     }
-  }, [params.id]);
+  }, [resolvedParams.id]);
 
   const handleEdit = () => {
-    router.push(`/products/${params.id}/edit`);
+    router.push(`/products/${resolvedParams.id}/edit`);
   };
 
   const handleDelete = async () => {

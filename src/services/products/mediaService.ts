@@ -372,7 +372,7 @@ export class ProductMediaService {
         filePath = `general/${usage_type}/${fileName}`;
       }
       
-      const bucketName = config.bucketName || 'media';
+      const bucketName = config.bucketName || 'media-files';
       
       // Upload file
       const { data: uploadData, error: uploadError } = await supabase.storage

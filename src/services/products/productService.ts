@@ -9,7 +9,16 @@ const productService = {
         .from('products')
         .select(`
           *,
-          categories(id, name, slug)
+          categories(id, name, slug),
+          media!product_id(
+            id,
+            file_name,
+            file_path,
+            bucket_name,
+            alt_text,
+            is_primary,
+            created_at
+          )
         `);
       
       // Apply filters

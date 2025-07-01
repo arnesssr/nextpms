@@ -25,7 +25,10 @@ const ProductCard: React.FC<ProductCardProps> = ({
     statusInfo,
     initials,
     shortDescription,
-    formattedSKU
+    formattedSKU,
+    primaryImage,
+    galleryImages,
+    hasImages
   } = formatProductData.formatProductCard(product);
 
   if (viewMode === 'list') {
@@ -34,17 +37,21 @@ const ProductCard: React.FC<ProductCardProps> = ({
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-4">
             <div className="flex-shrink-0">
-              {(product.gallery_images && product.gallery_images.length > 0) || product.featured_image_url ? (
+              {hasImages && primaryImage ? (
                 <img 
-                  src={product.featured_image_url || product.gallery_images?.[0]} 
+                  src={primaryImage} 
                   alt={product.name}
-                  className="h-12 w-12 rounded-lg object-cover"
+                  className="h-12 w-12 rounded-lg object-cover border shadow-sm"
+                  onError={(e) => {
+                    // Fallback to initials if image fails to load
+                    e.currentTarget.style.display = 'none';
+                    e.currentTarget.nextElementSibling.style.display = 'flex';
+                  }}
                 />
-              ) : (
-                <div className="h-12 w-12 rounded-lg bg-gray-200 flex items-center justify-center">
-                  <span className="text-gray-600 font-medium">{initials}</span>
-                </div>
-              )}
+              ) : null}
+              <div className={`h-12 w-12 rounded-lg bg-gradient-to-br from-blue-100 to-blue-200 flex items-center justify-center ${hasImages && primaryImage ? 'hidden' : ''}`}>
+                <span className="text-blue-700 font-semibold text-sm">{initials}</span>
+              </div>
             </div>
             <div className="flex-1 min-w-0">
               <h3 className="text-lg font-medium text-gray-900 truncate">{product.name}</h3>
@@ -123,15 +130,30 @@ const ProductCard: React.FC<ProductCardProps> = ({
       </div>
       
       <div className="flex justify-center mb-4">
-        {(product.gallery_images && product.gallery_images.length > 0) || product.featured_image_url ? (
-          <img 
-            src={product.featured_image_url || product.gallery_images?.[0]} 
-            alt={product.name}
-            className="h-32 w-32 rounded-lg object-cover"
-          />
+        {hasImages && primaryImage ? (
+          <div className="relative">
+            <img 
+              src={primaryImage} 
+              alt={product.name}
+              className="h-32 w-32 rounded-lg object-cover border-2 border-gray-200 shadow-sm hover:shadow-md transition-shadow"
+              onError={(e) => {
+                // Fallback to initials if image fails to load
+                e.currentTarget.style.display = 'none';
+                e.currentTarget.nextElementSibling.style.display = 'flex';
+              }}
+            />
+            {galleryImages.length > 1 && (
+              <div className="absolute -top-1 -right-1 bg-blue-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center font-medium">
+                {galleryImages.length}
+              </div>
+            )}
+          </div>
         ) : (
-          <div className="h-32 w-32 rounded-lg bg-gray-200 flex items-center justify-center">
-            <Package className="h-12 w-12 text-gray-400" />
+          <div className="h-32 w-32 rounded-lg bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center border-2 border-gray-200">
+            <div className="text-center">
+              <Package className="h-8 w-8 text-gray-400 mx-auto mb-1" />
+              <span className="text-gray-600 font-semibold text-sm">{initials}</span>
+            </div>
           </div>
         )}
       </div>
