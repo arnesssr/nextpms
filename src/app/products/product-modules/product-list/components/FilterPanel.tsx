@@ -26,11 +26,11 @@ const FilterPanel: React.FC<FilterPanelProps> = ({ onFilter }) => {
         onChange={(e) => setSelectedCategory(e.target.value)}
         className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
       >
-        <option value="">All Categories</option>
-        <option value="electronics">Electronics</option>
-        <option value="clothing">Clothing</option>
-        <option value="books">Books</option>
-        <option value="home">Home & Garden</option>
+        <option key="all-categories" value="">All Categories</option>
+        <option key="electronics" value="electronics">Electronics</option>
+        <option key="clothing" value="clothing">Clothing</option>
+        <option key="books" value="books">Books</option>
+        <option key="home" value="home">Home & Garden</option>
       </select>
       
       <select
@@ -38,10 +38,10 @@ const FilterPanel: React.FC<FilterPanelProps> = ({ onFilter }) => {
         onChange={(e) => setSelectedStatus(e.target.value as ProductStatus | '')}
         className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
       >
-        <option value="">All Status</option>
-        <option value="active">Active</option>
-        <option value="inactive">Inactive</option>
-        <option value="discontinued">Discontinued</option>
+        <option key="all-status" value="">All Status</option>
+        <option key="active" value="active">Active</option>
+        <option key="inactive" value="inactive">Inactive</option>
+        <option key="discontinued" value="discontinued">Discontinued</option>
       </select>
       
       <button

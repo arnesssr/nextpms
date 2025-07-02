@@ -1,18 +1,49 @@
 import { supabase } from '@/lib/supabaseClient';
 
-// Types for inventory management
+// Updated types for inventory management
 export interface InventoryItem {
   id: string;
-  name: string;
-  sku: string;
-  quantity: number;
-  unit_price: number;
-  category: string;
-  low_stock_threshold: number;
-  location?: string;
-  supplier?: string;
+  product_id: string;
+  location_id: string;
+  location_name: string;
+  quantity_on_hand: number;
+  quantity_available: number;
+  quantity_reserved: number;
+  quantity_allocated: number;
+  quantity_incoming: number;
+  min_stock_level: number;
+  max_stock_level?: number;
+  reorder_point: number;
+  reorder_quantity: number;
+  unit_cost: number;
+  total_cost: number;
+  last_purchase_cost?: number;
+  average_cost: number;
+  batch_number?: string;
+  lot_number?: string;
+  expiry_date?: string;
+  manufacture_date?: string;
+  status: string;
+  is_tracked: boolean;
+  is_serialized: boolean;
+  is_perishable: boolean;
+  requires_quality_check: boolean;
+  last_movement_date?: string;
+  last_movement_type?: string;
+  last_counted_date?: string;
+  last_counted_by?: string;
+  created_by?: string;
   created_at: string;
   updated_at: string;
+  // Product information (from join)
+  product_name?: string;
+  product_sku?: string;
+  product_barcode?: string;
+  category_name?: string;
+  primary_image_path?: string;
+  stock_status?: string;
+  inventory_value?: number;
+  potential_revenue?: number;
 }
 
 export interface PurchaseOrder {
@@ -53,7 +84,19 @@ export const inventoryService = {
   async getInventoryItems(): Promise<InventoryItem[]> {
     const { data, error } = await supabase
       .from('inventory_items')
-      .select('*')
+      .select(`
+        *,
+        products (
+          name,
+          sku,
+          barcode,
+          selling_price,
+          cost_price,
+          categories (
+            name
+          )
+        )
+      `)
       .order('created_at', { ascending: false });
 
     if (error) throw error;

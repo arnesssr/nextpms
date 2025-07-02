@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { SidebarLayout } from '@/components/layout/Sidebar';
 import { InventoryTable } from '@/components/tables/InventoryTable';
 import { StockAdjustmentModal } from '@/components/forms/StockAdjustmentModal';
@@ -59,163 +59,74 @@ export default function InventoryPage() {
   const [selectedItem, setSelectedItem] = useState<InventoryItem | null>(null);
 
   // Use hooks for module data
-  const { stocks, isLoading: stocksLoading, error: stocksError } = useStock();
-  const { adjustments, isLoading: adjustmentsLoading, error: adjustmentsError } = useAdjustments();
-  const { movements, isLoading: movementsLoading, error: movementsError } = useMovements();
+  const { stocks, loading: stocksLoading, error: stocksError, fetchStocks } = useStock();
+  const { adjustments, loading: adjustmentsLoading, error: adjustmentsError } = useAdjustments();
+  const { movements, loading: movementsLoading, error: movementsError } = useMovements();
 
-  // Mock product data
-  const mockProducts: Product[] = [
-    {
-      id: '1',
-      name: 'Wireless Headphones',
-      description: 'Premium noise-cancelling wireless headphones',
-      price: 299.99,
-      categoryId: 'cat-1',
-      images: ['https://via.placeholder.com/300x200'],
-      status: 'published',
-      stock: 45,
-      sku: 'WH-001',
-      createdAt: '2024-01-15T10:00:00Z',
-      updatedAt: '2024-01-20T15:30:00Z',
-    },
-    {
-      id: '2',
-      name: 'Smart Watch Pro',
-      description: 'Advanced fitness tracking smartwatch',
-      price: 399.99,
-      categoryId: 'cat-2',
-      images: ['https://via.placeholder.com/300x200'],
-      status: 'published',
-      stock: 23,
-      sku: 'SW-002',
-      createdAt: '2024-01-10T09:00:00Z',
-      updatedAt: '2024-01-18T14:20:00Z',
-    },
-    {
-      id: '3',
-      name: 'Gaming Mouse',
-      description: 'High-precision gaming mouse',
-      price: 79.99,
-      categoryId: 'cat-3',
-      images: ['https://via.placeholder.com/300x200'],
-      status: 'published',
-      stock: 67,
-      sku: 'GM-003',
-      createdAt: '2024-01-25T11:30:00Z',
-      updatedAt: '2024-01-26T09:15:00Z',
-    },
-    {
-      id: '4',
-      name: 'Bluetooth Speaker',
-      description: 'Portable waterproof speaker',
-      price: 149.99,
-      categoryId: 'cat-1',
-      images: ['https://via.placeholder.com/300x200'],
-      status: 'published',
-      stock: 8,
-      sku: 'BS-004',
-      createdAt: '2024-01-20T16:45:00Z',
-      updatedAt: '2024-01-22T10:30:00Z',
-    },
-    {
-      id: '5',
-      name: 'USB-C Hub',
-      description: '7-in-1 USB-C hub',
-      price: 59.99,
-      categoryId: 'cat-3',
-      images: ['https://via.placeholder.com/300x200'],
-      status: 'published',
-      stock: 0,
-      sku: 'UH-005',
-      createdAt: '2024-01-05T08:20:00Z',
-      updatedAt: '2024-01-30T13:45:00Z',
-    },
-    {
-      id: '6',
-      name: 'Wireless Charger',
-      description: 'Fast wireless charging pad',
-      price: 39.99,
-      categoryId: 'cat-3',
-      images: ['https://via.placeholder.com/300x200'],
-      status: 'published',
-      stock: 156,
-      sku: 'WC-006',
-      createdAt: '2024-01-12T14:20:00Z',
-      updatedAt: '2024-01-15T11:30:00Z',
+  // Load data on component mount
+  useEffect(() => {
+    console.log('InventoryPage: Component mounted, calling fetchStocks');
+    fetchStocks();
+  }, []); // Empty dependency array to run only once on mount
+
+  // Debug log when stocks data changes
+  useEffect(() => {
+    console.log('InventoryPage: Stocks data changed:', {
+      stocksLength: stocks.length,
+      stocks: stocks,
+      stocksLoading,
+      stocksError
+    });
+  }, [stocks, stocksLoading, stocksError]);
+
+  // Add temporary direct product fetch for display
+  const [tempProducts, setTempProducts] = useState([]);
+  const [tempLoading, setTempLoading] = useState(false);
+
+  const fetchProductsDirectly = async () => {
+    setTempLoading(true);
+    try {
+      const response = await fetch('/api/products');
+      const data = await response.json();
+      console.log('Direct products fetch:', data);
+      if (data.data) {
+        setTempProducts(data.data);
+      }
+    } catch (error) {
+      console.error('Error fetching products directly:', error);
+    } finally {
+      setTempLoading(false);
     }
-  ];
+  };
 
-  // Mock inventory data - will be replaced with real API calls
-  const mockInventory: InventoryItem[] = [
-    {
-      id: 'inv-1',
-      productId: '1',
-      quantity: 45,
-      reservedQuantity: 5,
-      lowStockThreshold: 10,
-      location: 'Warehouse A',
-      lastUpdated: '2024-02-03T14:30:00Z'
-    },
-    {
-      id: 'inv-2',
-      productId: '2',
-      quantity: 23,
-      reservedQuantity: 3,
-      lowStockThreshold: 15,
-      location: 'Warehouse A',
-      lastUpdated: '2024-02-03T12:15:00Z'
-    },
-    {
-      id: 'inv-3',
-      productId: '3',
-      quantity: 67,
-      reservedQuantity: 8,
-      lowStockThreshold: 20,
-      location: 'Warehouse B',
-      lastUpdated: '2024-02-03T16:20:00Z'
-    },
-    {
-      id: 'inv-4',
-      productId: '4',
-      quantity: 8,
-      reservedQuantity: 2,
-      lowStockThreshold: 10,
-      location: 'Warehouse A',
-      lastUpdated: '2024-02-03T09:45:00Z'
-    },
-    {
-      id: 'inv-5',
-      productId: '5',
-      quantity: 0,
-      reservedQuantity: 0,
-      lowStockThreshold: 5,
-      location: 'Warehouse B',
-      lastUpdated: '2024-02-02T18:30:00Z'
-    },
-    {
-      id: 'inv-6',
-      productId: '6',
-      quantity: 156,
-      reservedQuantity: 12,
-      lowStockThreshold: 25,
-      location: 'Warehouse A',
-      lastUpdated: '2024-02-03T11:10:00Z'
-    }
-  ];
+  useEffect(() => {
+    fetchProductsDirectly();
+  }, []);
 
-  // Create a map for quick product lookup
-  const productMap = mockProducts.reduce((map, product) => {
-    map[product.id] = product;
-    return map;
-  }, {} as Record<string, Product>);
+  // Convert stocks data to match the InventoryTable format from API response
+  const enhancedInventory = stocks.map(stock => {
+    // Handle both direct stock data and nested product data from API
+    const productData = stock.products || stock.product || {};
+    
+    return {
+      id: stock.id,
+      productId: stock.product_id || stock.productId || stock.id,
+      quantity: stock.quantity_on_hand || stock.currentQuantity || 0,
+      reservedQuantity: stock.quantity_reserved || stock.reservedQuantity || 0,
+      lowStockThreshold: stock.min_stock_level || stock.minimumQuantity || 0,
+      location: stock.location_name || stock.location || 'Unknown',
+      lastUpdated: stock.updated_at || stock.lastUpdated || new Date().toISOString(),
+      product: {
+        id: stock.product_id || stock.productId || stock.id,
+        name: productData.name || stock.productName || 'Unknown Product',
+        sku: productData.sku || stock.productSku || 'N/A',
+        price: productData.selling_price || stock.unitPrice || 0,
+        status: 'published' as const
+      }
+    };
+  });
 
-  // Enhanced inventory data with product info
-  const enhancedInventory = mockInventory.map(item => ({
-    ...item,
-    product: productMap[item.productId]
-  }));
-
-  // Calculate stats
+  // Calculate stats from real data
   const totalProducts = enhancedInventory.length;
   const totalStockValue = enhancedInventory.reduce((sum, item) => 
     sum + (item.quantity * (item.product?.price || 0)), 0
@@ -257,7 +168,7 @@ export default function InventoryPage() {
   };
 
   // Get unique locations for filter
-  const locations = [...new Set(mockInventory.map(item => item.location))];
+  const locations = [...new Set(enhancedInventory.map(item => item.location))];
 
   return (
     <SidebarLayout>
@@ -331,6 +242,18 @@ export default function InventoryPage() {
               
               <TabsContent value="overview" className="mt-6">
                 <div className="space-y-4">
+                  {/* Debug Info */}
+                  <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                    <h4 className="font-semibold text-yellow-800">Debug Info:</h4>
+                    <div className="text-sm text-yellow-700 mt-2 space-y-1">
+                      <p>Stocks Loading: {stocksLoading ? 'Yes' : 'No'}</p>
+                      <p>Stocks Count: {stocks.length}</p>
+                      <p>Stocks Error: {stocksError || 'None'}</p>
+                      <p>Temp Products Count: {tempProducts.length}</p>
+                      <p>Temp Loading: {tempLoading ? 'Yes' : 'No'}</p>
+                    </div>
+                  </div>
+                  
                   <div className="flex items-center justify-between">
                     <h3 className="text-lg font-semibold">Inventory Overview</h3>
                     <div className="flex space-x-2">
@@ -371,23 +294,169 @@ export default function InventoryPage() {
                     </div>
                   </div>
                   
-                  <InventoryTable 
-                    inventory={filteredInventory}
-                    onStockAdjustment={handleStockAdjustment}
-                  />
+                  {/* Temporary Products Display */}
+                  {tempProducts.length > 0 && (
+                    <div className="mb-6">
+                      <h4 className="text-md font-semibold mb-3 text-green-700">📦 Temporary Products Display (Real Data):</h4>
+                      <div className="bg-white rounded-lg shadow border overflow-hidden">
+                        <div className="overflow-x-auto">
+                          <table className="min-w-full divide-y divide-gray-200">
+                            <thead className="bg-gray-50">
+                              <tr>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Product</th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">SKU</th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Stock</th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Price</th>
+                              </tr>
+                            </thead>
+                            <tbody className="bg-white divide-y divide-gray-200">
+                              {tempProducts.map((product: any) => (
+                                <tr key={product.id} className="hover:bg-gray-50">
+                                  <td className="px-6 py-4 whitespace-nowrap">
+                                    <div className="text-sm font-medium text-gray-900">{product.name}</div>
+                                  </td>
+                                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                    {product.sku || 'N/A'}
+                                  </td>
+                                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                    {product.stock_quantity || 0}
+                                  </td>
+                                  <td className="px-6 py-4 whitespace-nowrap">
+                                    <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                                      (product.stock_quantity || 0) > 10
+                                        ? 'bg-green-100 text-green-800'
+                                        : (product.stock_quantity || 0) > 0
+                                        ? 'bg-yellow-100 text-yellow-800'
+                                        : 'bg-red-100 text-red-800'
+                                    }`}>
+                                      {(product.stock_quantity || 0) > 10 ? 'In Stock' : (product.stock_quantity || 0) > 0 ? 'Low Stock' : 'Out of Stock'}
+                                    </span>
+                                  </td>
+                                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                    ${product.selling_price || '0.00'}
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                  
+                  {/* Original Inventory Table */}
+                  <div className="mb-6">
+                    <h4 className="text-md font-semibold mb-3 text-blue-700">📋 Inventory API Data:</h4>
+                    <InventoryTable 
+                      inventory={filteredInventory}
+                      onStockAdjustment={handleStockAdjustment}
+                    />
+                  </div>
                 </div>
               </TabsContent>
               
               <TabsContent value="stock" className="mt-6">
-                <StockList stocks={stocks} />
+                <div className="space-y-4">
+                  {/* Stock Tab Debug Info */}
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                    <h4 className="font-semibold text-blue-800">Stock Tab Debug:</h4>
+                    <div className="text-sm text-blue-700 mt-2 space-y-1">
+                      <p>Loading: {stocksLoading ? 'Yes' : 'No'}</p>
+                      <p>Error: {stocksError || 'None'}</p>
+                      <p>Stocks Count: {stocks.length}</p>
+                    </div>
+                  </div>
+                  
+                  {stocksLoading ? (
+                    <div className="flex items-center justify-center py-12">
+                      <div className="text-center">
+                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-2"></div>
+                        <p className="text-sm text-gray-600">Loading stock data...</p>
+                      </div>
+                    </div>
+                  ) : stocksError ? (
+                    <div className="flex items-center justify-center py-12">
+                      <div className="text-center">
+                        <AlertTriangle className="h-8 w-8 text-red-500 mx-auto mb-2" />
+                        <p className="text-red-600 font-medium">Error loading stock data</p>
+                        <p className="text-sm text-gray-600">{stocksError}</p>
+                        <Button onClick={fetchStocks} className="mt-3" size="sm">
+                          <RefreshCw className="mr-2 h-4 w-4" />
+                          Retry
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <StockList stocks={stocks} />
+                  )}
+                </div>
               </TabsContent>
               
               <TabsContent value="movements" className="mt-6">
-                <MovementsList movements={movements} />
+                <div className="space-y-4">
+                  {/* Movements Tab Debug Info */}
+                  <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                    <h4 className="font-semibold text-green-800">Movements Tab Debug:</h4>
+                    <div className="text-sm text-green-700 mt-2 space-y-1">
+                      <p>Loading: {movementsLoading ? 'Yes' : 'No'}</p>
+                      <p>Error: {movementsError || 'None'}</p>
+                      <p>Movements Count: {movements.length}</p>
+                    </div>
+                  </div>
+                  
+                  {movementsLoading ? (
+                    <div className="flex items-center justify-center py-12">
+                      <div className="text-center">
+                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-600 mx-auto mb-2"></div>
+                        <p className="text-sm text-gray-600">Loading movements data...</p>
+                      </div>
+                    </div>
+                  ) : movementsError ? (
+                    <div className="flex items-center justify-center py-12">
+                      <div className="text-center">
+                        <AlertTriangle className="h-8 w-8 text-red-500 mx-auto mb-2" />
+                        <p className="text-red-600 font-medium">Error loading movements data</p>
+                        <p className="text-sm text-gray-600">{movementsError}</p>
+                      </div>
+                    </div>
+                  ) : (
+                    <MovementsList movements={movements} />
+                  )}
+                </div>
               </TabsContent>
               
               <TabsContent value="adjustments" className="mt-6">
-                <AdjustmentsList adjustments={adjustments} />
+                <div className="space-y-4">
+                  {/* Adjustments Tab Debug Info */}
+                  <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
+                    <h4 className="font-semibold text-purple-800">Adjustments Tab Debug:</h4>
+                    <div className="text-sm text-purple-700 mt-2 space-y-1">
+                      <p>Loading: {adjustmentsLoading ? 'Yes' : 'No'}</p>
+                      <p>Error: {adjustmentsError || 'None'}</p>
+                      <p>Adjustments Count: {adjustments.length}</p>
+                    </div>
+                  </div>
+                  
+                  {adjustmentsLoading ? (
+                    <div className="flex items-center justify-center py-12">
+                      <div className="text-center">
+                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600 mx-auto mb-2"></div>
+                        <p className="text-sm text-gray-600">Loading adjustments data...</p>
+                      </div>
+                    </div>
+                  ) : adjustmentsError ? (
+                    <div className="flex items-center justify-center py-12">
+                      <div className="text-center">
+                        <AlertTriangle className="h-8 w-8 text-red-500 mx-auto mb-2" />
+                        <p className="text-red-600 font-medium">Error loading adjustments data</p>
+                        <p className="text-sm text-gray-600">{adjustmentsError}</p>
+                      </div>
+                    </div>
+                  ) : (
+                    <AdjustmentsList adjustments={adjustments} />
+                  )}
+                </div>
               </TabsContent>
             </Tabs>
           </CardContent>
@@ -400,7 +469,7 @@ export default function InventoryPage() {
           isOpen={isAdjustmentModalOpen}
           onClose={handleModalClose}
           item={selectedItem}
-          products={mockProducts}
+          products={[]}
         />
       </div>
     </SidebarLayout>

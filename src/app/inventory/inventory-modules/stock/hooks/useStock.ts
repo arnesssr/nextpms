@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { 
   Stock, 
   StockFilter, 
@@ -16,19 +16,22 @@ export const useStock = () => {
   const [error, setError] = useState<string | null>(null);
 
   // Fetch all stocks with optional filters
-  const fetchStocks = async (filters?: StockFilter) => {
+  const fetchStocks = useCallback(async (filters?: StockFilter) => {
+    console.log('fetchStocks called with filters:', filters);
     setLoading(true);
     setError(null);
     
     try {
       const stockData = await StockService.getStocks(filters);
+      console.log('Stock data received:', stockData);
       setStocks(stockData);
     } catch (err) {
+      console.error('Error fetching stocks:', err);
       setError(err instanceof Error ? err.message : 'Failed to fetch stocks');
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   // Create new stock
   const createStock = async (stockData: CreateStockRequest): Promise<Stock | null> => {

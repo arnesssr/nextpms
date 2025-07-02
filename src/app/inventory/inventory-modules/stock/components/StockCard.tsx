@@ -142,12 +142,12 @@ export default function StockCard({
               
               <div>
                 <span className="text-gray-500">Unit Cost:</span>
-                <p className="font-medium text-gray-900">${stock.costPerUnit.toFixed(2)}</p>
+                <p className="font-medium text-gray-900">${(stock.costPerUnit ?? 0).toFixed(2)}</p>
               </div>
               
               <div>
                 <span className="text-gray-500">Total Value:</span>
-                <p className="font-medium text-green-600">${stock.totalValue.toLocaleString()}</p>
+                <p className="font-medium text-green-600">${(stock.totalValue ?? 0).toLocaleString()}</p>
               </div>
             </div>
 

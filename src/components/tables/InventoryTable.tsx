@@ -197,7 +197,10 @@ export function InventoryTable({ inventory, onStockAdjustment }: InventoryTableP
                     <TableCell>
                       <div className="flex items-center space-x-3">
                         <Avatar className="h-10 w-10">
-                          <AvatarImage src={item.product?.images[0]} alt={item.product?.name} />
+                          <AvatarImage 
+                            src={item.product?.images?.[0] || item.product?.featured_image_url || ''} 
+                            alt={item.product?.name || 'Product'} 
+                          />
                           <AvatarFallback>
                             {item.product?.name?.substring(0, 2).toUpperCase() || 'PR'}
                           </AvatarFallback>

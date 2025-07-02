@@ -12,6 +12,31 @@ const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || '/api';
 
 export class StockService {
   
+  // Transform API response to match Stock interface
+  private static transformApiResponseToStock(apiStock: any): Stock {
+    const productData = apiStock.products || apiStock.product || {};
+    
+    return {
+      id: apiStock.id,
+      productId: apiStock.product_id || apiStock.productId,
+      productName: productData.name || apiStock.productName || 'Unknown Product',
+      productSku: productData.sku || apiStock.productSku || 'N/A',
+      currentQuantity: apiStock.quantity || apiStock.quantity_on_hand || 0,
+      minimumQuantity: apiStock.min_stock_level || apiStock.minStockLevel || 0,
+      maximumQuantity: apiStock.max_stock_level || apiStock.maxStockLevel || null,
+      unitOfMeasure: apiStock.unit_of_measure || apiStock.unitOfMeasure || 'units',
+      location: apiStock.location_name || apiStock.location || '',
+      costPerUnit: apiStock.cost_per_unit || apiStock.costPerUnit || 0,
+      totalValue: (apiStock.cost_per_unit || apiStock.costPerUnit || 0) * (apiStock.quantity || apiStock.quantity_on_hand || 0),
+      status: apiStock.status as StockStatus || 'in_stock',
+      lastUpdated: apiStock.updated_at ? new Date(apiStock.updated_at) : (apiStock.lastUpdated ? new Date(apiStock.lastUpdated) : new Date()),
+      lastRestocked: apiStock.last_restocked || apiStock.lastRestocked || null,
+      notes: apiStock.notes || '',
+      createdAt: apiStock.created_at || apiStock.createdAt,
+      updatedAt: apiStock.updated_at || apiStock.updatedAt
+    };
+  }
+
   // Get all stock items with optional filtering
   static async getStocks(filters?: StockFilter): Promise<Stock[]> {
     try {
@@ -25,14 +50,18 @@ export class StockService {
         });
       }
       
-      const url = `${API_BASE_URL}/stock${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
+      const url = `${API_BASE_URL}/inventory${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
       const response = await fetch(url);
       
       if (!response.ok) {
         throw new Error(`Failed to fetch stocks: ${response.statusText}`);
       }
       
-      return response.json();
+      const result = await response.json();
+      const rawData = result.data || [];
+      
+      // Transform each item to match Stock interface
+      return rawData.map((item: any) => this.transformApiResponseToStock(item));
     } catch (error) {
       console.error('Error fetching stocks:', error);
       throw error;
@@ -42,13 +71,14 @@ export class StockService {
   // Get single stock item by ID
   static async getStockById(id: string): Promise<Stock> {
     try {
-      const response = await fetch(`${API_BASE_URL}/stock/${id}`);
+      const response = await fetch(`${API_BASE_URL}/inventory/${id}`);
       
       if (!response.ok) {
         throw new Error(`Failed to fetch stock: ${response.statusText}`);
       }
       
-      return response.json();
+      const result = await response.json();
+      return this.transformApiResponseToStock(result.data || result);
     } catch (error) {
       console.error('Error fetching stock by ID:', error);
       throw error;
@@ -58,7 +88,7 @@ export class StockService {
   // Create new stock entry
   static async createStock(stockData: CreateStockRequest): Promise<Stock> {
     try {
-      const response = await fetch(`${API_BASE_URL}/stock`, {
+      const response = await fetch(`${API_BASE_URL}/inventory`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -80,7 +110,7 @@ export class StockService {
   // Update existing stock
   static async updateStock(stockData: UpdateStockRequest): Promise<Stock> {
     try {
-      const response = await fetch(`${API_BASE_URL}/stock/${stockData.id}`, {
+      const response = await fetch(`${API_BASE_URL}/inventory/${stockData.id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -102,7 +132,7 @@ export class StockService {
   // Delete stock item
   static async deleteStock(id: string): Promise<void> {
     try {
-      const response = await fetch(`${API_BASE_URL}/stock/${id}`, {
+      const response = await fetch(`${API_BASE_URL}/inventory/${id}`, {
         method: 'DELETE',
       });
       
@@ -118,7 +148,7 @@ export class StockService {
   // Get stock summary/dashboard data
   static async getStockSummary(): Promise<StockSummary> {
     try {
-      const response = await fetch(`${API_BASE_URL}/stock/summary`);
+      const response = await fetch(`${API_BASE_URL}/inventory/summary`);
       
       if (!response.ok) {
         throw new Error(`Failed to fetch stock summary: ${response.statusText}`);
@@ -134,13 +164,17 @@ export class StockService {
   // Get low stock items
   static async getLowStockItems(): Promise<Stock[]> {
     try {
-      const response = await fetch(`${API_BASE_URL}/stock/low-stock`);
+      const response = await fetch(`${API_BASE_URL}/inventory?low_stock=true`);
       
       if (!response.ok) {
         throw new Error(`Failed to fetch low stock items: ${response.statusText}`);
       }
       
-      return response.json();
+      const result = await response.json();
+      const rawData = result.data || [];
+      
+      // Transform each item to match Stock interface
+      return rawData.map((item: any) => this.transformApiResponseToStock(item));
     } catch (error) {
       console.error('Error fetching low stock items:', error);
       throw error;
@@ -150,7 +184,7 @@ export class StockService {
   // Bulk update stock quantities
   static async bulkUpdateQuantities(updates: { id: string; quantity: number }[]): Promise<Stock[]> {
     try {
-      const response = await fetch(`${API_BASE_URL}/stock/bulk-update`, {
+      const response = await fetch(`${API_BASE_URL}/inventory/bulk-update`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
