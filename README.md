@@ -1,6 +1,6 @@
 
 
-A modern, modular Property Management System (PMS) frontend application built with Next.js 15, React 19, and TypeScript. This project follows a clean, modular architecture designed for scalability, maintainability, and ease of development.
+A modern, modular Product Management System (PMS)  application built with Next.js 15, React 19, and TypeScript. This project follows a clean, modular architecture designed for scalability, maintainability, and ease of development.
 
 ## 🚀 Quick Start
 
