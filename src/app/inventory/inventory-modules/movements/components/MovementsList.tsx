@@ -145,6 +145,55 @@ export function MovementsList({
     return labels[reason];
   };
 
+  const exportToCSV = () => {
+    const headers = [
+      'Date',
+      'Item',
+      'Type',
+      'Reason',
+      'Quantity',
+      'Unit Cost',
+      'Total Cost',
+      'Location',
+      'User',
+      'Reference',
+      'Supplier/Customer',
+      'Notes'
+    ];
+
+    const csvData = movements.map(movement => [
+      format(new Date(movement.timestamp), 'yyyy-MM-dd HH:mm:ss'),
+      movement.productName || movement.productId,
+      getMovementTypeLabel(movement.type),
+      getReasonLabel(movement.reason),
+      movement.quantity,
+      movement.unitCost || 0,
+      movement.totalCost || 0,
+      movement.location,
+      movement.userName || movement.userId,
+      movement.reference || '',
+      movement.supplier || movement.customer || '',
+      movement.notes || ''
+    ]);
+
+    const csvContent = [headers, ...csvData]
+      .map(row => row.map(field => `"${field}"`).join(','))
+      .join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    
+    if (link.download !== undefined) {
+      const url = URL.createObjectURL(blob);
+      link.setAttribute('href', url);
+      link.setAttribute('download', `movements-export-${format(new Date(), 'yyyy-MM-dd')}.csv`);
+      link.style.visibility = 'hidden';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Stats Cards */}
@@ -250,7 +299,7 @@ export function MovementsList({
                   Refresh
                 </Button>
               )}
-              <Button variant="outline" size="sm">
+              <Button variant="outline" size="sm" onClick={exportToCSV}>
                 <Download className="h-4 w-4 mr-2" />
                 Export
               </Button>
