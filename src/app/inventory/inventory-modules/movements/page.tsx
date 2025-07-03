@@ -34,6 +34,14 @@ export default function MovementsPage() {
 
   const [isStockInModalOpen, setIsStockInModalOpen] = useState(false);
   const [isStockOutModalOpen, setIsStockOutModalOpen] = useState(false);
+  
+  // Debug logging for modal states
+  React.useEffect(() => {
+    console.log('Modal states changed:', {
+      stockIn: isStockInModalOpen,
+      stockOut: isStockOutModalOpen
+    });
+  }, [isStockInModalOpen, isStockOutModalOpen]);
   const [selectedMovement, setSelectedMovement] = useState<Movement | null>(null);
 
   // Mock data for dropdowns
@@ -42,11 +50,14 @@ export default function MovementsPage() {
   const customers = ['Tech Solutions Inc', 'Digital Corp', 'Innovation Labs', 'Future Systems'];
 
   const handleStockInSave = async (request: CreateMovementRequest) => {
+    console.log('Saving stock in request:', request);
     const newMovement = await createMovement(request);
     if (newMovement) {
+      console.log('Stock in created successfully:', newMovement);
       toast.success('Stock in recorded successfully');
       setIsStockInModalOpen(false);
     } else {
+      console.error('Failed to create stock in movement');
       toast.error('Failed to record stock in');
     }
   };
@@ -116,7 +127,11 @@ export default function MovementsPage() {
           onFilter={setFilter}
           onDelete={handleDeleteMovement}
           onView={handleViewMovement}
-          onCreateStockIn={() => setIsStockInModalOpen(true)}
+          onCreateStockIn={() => {
+            console.log('Create Stock In clicked!');
+            alert('Create Stock In clicked!');
+            setIsStockInModalOpen(true);
+          }}
           onCreateStockOut={() => setIsStockOutModalOpen(true)}
           showStats={false} // We have summary cards above
         />

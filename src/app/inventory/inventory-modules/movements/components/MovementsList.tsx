@@ -16,7 +16,8 @@ import {
   X,
   ArrowUp,
   ArrowDown,
-  Plus
+  Plus,
+  ChevronDown
 } from 'lucide-react';
 import { format, subDays, startOfDay, endOfDay } from 'date-fns';
 
@@ -227,27 +228,25 @@ export function MovementsList({
                 <Download className="h-4 w-4 mr-2" />
                 Export
               </Button>
-              {onCreateStockOut && (
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  onClick={onCreateStockOut}
-                  className="text-red-600 hover:text-red-700 border-red-200 hover:border-red-300"
-                >
-                  <ArrowDown className="h-4 w-4 mr-2" />
-                  Stock Out
-                </Button>
-              )}
-              {onCreateStockIn && (
-                <Button 
-                  size="sm" 
-                  onClick={onCreateStockIn}
-                  className="bg-green-600 hover:bg-green-700"
-                >
-                  <ArrowUp className="h-4 w-4 mr-2" />
-                  Stock In
-                </Button>
-              )}
+              
+              {/* Create Movement Button */}
+              <Button 
+                size="sm" 
+                onClick={() => {
+                  console.log('Create Movement button clicked in MovementsList');
+                  console.log('onCreateStockIn function:', onCreateStockIn);
+                  if (onCreateStockIn) {
+                    onCreateStockIn();
+                  } else {
+                    console.error('onCreateStockIn is not provided!');
+                  }
+                }}
+                className="bg-green-600 hover:bg-green-700 text-white"
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                Create Movement
+              </Button>
+              
             </div>
           </div>
         </CardHeader>
@@ -384,6 +383,71 @@ export function MovementsList({
           )}
         </CardContent>
       </Card>
+    </div>
+  );
+}
+
+// Create Movement Dropdown Component
+interface CreateMovementDropdownProps {
+  onCreateStockIn?: () => void;
+  onCreateStockOut?: () => void;
+}
+
+function CreateMovementDropdown({ onCreateStockIn, onCreateStockOut }: CreateMovementDropdownProps) {
+  const [isOpen, setIsOpen] = useState(false);
+
+  return (
+    <div className="relative">
+      <Button 
+        size="sm" 
+        onClick={() => setIsOpen(!isOpen)}
+        className="bg-blue-600 hover:bg-blue-700 text-white"
+      >
+        <Plus className="h-4 w-4 mr-2" />
+        Create Movement
+        <ChevronDown className="h-4 w-4 ml-2" />
+      </Button>
+
+      {isOpen && (
+        <Card className="absolute top-full right-0 z-50 mt-1 w-48">
+          <CardContent className="p-0">
+            <div className="py-2">
+              {onCreateStockIn && (
+                <button
+                  onClick={() => {
+                    onCreateStockIn();
+                    setIsOpen(false);
+                  }}
+                  className="w-full text-left px-4 py-2 text-sm hover:bg-gray-100 flex items-center"
+                >
+                  <ArrowUp className="h-4 w-4 mr-2 text-green-600" />
+                  Stock In
+                </button>
+              )}
+              {onCreateStockOut && (
+                <button
+                  onClick={() => {
+                    onCreateStockOut();
+                    setIsOpen(false);
+                  }}
+                  className="w-full text-left px-4 py-2 text-sm hover:bg-gray-100 flex items-center"
+                >
+                  <ArrowDown className="h-4 w-4 mr-2 text-red-600" />
+                  Stock Out
+                </button>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Backdrop to close dropdown */}
+      {isOpen && (
+        <div 
+          className="fixed inset-0 z-40" 
+          onClick={() => setIsOpen(false)}
+        />
+      )}
     </div>
   );
 }

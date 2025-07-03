@@ -77,7 +77,7 @@ export function useAdjustments(initialFilterOverride?: AdjustmentFilter): UseAdj
       setLoading(true);
       setError(null);
       
-      const data = await adjustmentsService.getAdjustments(filter);
+      const data = await adjustmentsService.fetchAdjustments(filter);
       setAdjustments(data);
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to load adjustments';
@@ -93,7 +93,7 @@ export function useAdjustments(initialFilterOverride?: AdjustmentFilter): UseAdj
     try {
       setError(null);
       
-      const data = await adjustmentsService.getAdjustmentSummary(filter);
+      const data = await adjustmentsService.fetchAdjustmentSummary(filter);
       setSummary(data);
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to load summary';
@@ -107,7 +107,7 @@ export function useAdjustments(initialFilterOverride?: AdjustmentFilter): UseAdj
     try {
       setError(null);
       
-      const data = await adjustmentsService.getAdjustmentsByProduct(filter);
+      const data = await adjustmentsService.fetchAdjustmentsByProduct(filter);
       setAdjustmentsByProduct(data);
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to load adjustments by product';
@@ -121,7 +121,7 @@ export function useAdjustments(initialFilterOverride?: AdjustmentFilter): UseAdj
     try {
       setError(null);
       
-      const data = await adjustmentsService.getAdjustmentsByReason(filter);
+      const data = await adjustmentsService.fetchAdjustmentsByReason(filter);
       setAdjustmentsByReason(data);
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to load adjustments by reason';

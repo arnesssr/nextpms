@@ -93,18 +93,56 @@ export default function InventoryPage() {
   const [isStockDetailOpen, setIsStockDetailOpen] = useState(false);
   const [selectedStockForView, setSelectedStockForView] = useState(null);
   const [isPurchaseOrderModalOpen, setIsPurchaseOrderModalOpen] = useState(false);
+  const [isStockInModalOpen, setIsStockInModalOpen] = useState(false);
+  const [isStockOutModalOpen, setIsStockOutModalOpen] = useState(false);
 
   // Use hooks for module data
   const { stocks, loading: stocksLoading, error: stocksError, fetchStocks } = useStock();
   const { adjustments, loading: adjustmentsLoading, error: adjustmentsError } = useAdjustments();
-  const { movements, loading: movementsLoading, error: movementsError } = useMovements();
+  const { 
+    movements, 
+    loading: movementsLoading, 
+    error: movementsError, 
+    createMovement,
+    deleteMovement,
+    refreshData: refreshMovements
+  } = useMovements();
   const { defaultWarehouse, loading: defaultWarehouseLoading, error: warehouseError } = useDefaultWarehouse();
+  
+  // State for warehouses and locations
+  const [warehouses, setWarehouses] = useState([]);
+  const [locations, setLocations] = useState([]);
+  const [suppliers, setSuppliers] = useState([]);
 
   // Load data on component mount
   useEffect(() => {
     console.log('InventoryPage: Component mounted, calling fetchStocks');
     fetchStocks();
+    loadWarehousesAndSuppliers();
   }, []); // Empty dependency array to run only once on mount
+
+  // Load warehouses and suppliers for modals
+  const loadWarehousesAndSuppliers = async () => {
+    try {
+      // Load warehouses
+      const warehousesResponse = await fetch('/api/warehouses');
+      if (warehousesResponse.ok) {
+        const warehousesData = await warehousesResponse.json();
+        const warehouseNames = warehousesData.data?.map((w: any) => w.name) || [];
+        setWarehouses(warehouseNames);
+        setLocations(warehouseNames);
+      }
+
+      // Load suppliers (mock data for now - you can replace with actual API call)
+      setSuppliers(['AudioTech Ltd', 'SmartTech Corp', 'ElectroSupply Inc', 'TechVendor Co']);
+    } catch (error) {
+      console.error('Error loading warehouses and suppliers:', error);
+      // Fallback to default values
+      setWarehouses(['Main Warehouse']);
+      setLocations(['Main Warehouse']);
+      setSuppliers(['AudioTech Ltd', 'SmartTech Corp', 'ElectroSupply Inc', 'TechVendor Co']);
+    }
+  };
 
   // Set default warehouse when loaded
   useEffect(() => {
@@ -241,7 +279,7 @@ export default function InventoryPage() {
   };
 
   // Get unique locations for filter
-  const locations = [...new Set(enhancedInventory.map(item => item.location))];
+  const inventoryLocations = [...new Set(enhancedInventory.map(item => item.location))];
 
   // Action handlers for overview buttons
   const [isLoading, setIsLoading] = useState(false);
@@ -332,6 +370,63 @@ export default function InventoryPage() {
   const handleBulkReorderPoints = () => {
     // Open the dedicated bulk reorder points modal
     setIsBulkReorderPointsModalOpen(true);
+  };
+
+  // Movement handlers
+  const handleStockInSave = async (request: CreateMovementRequest) => {
+    console.log('Creating stock in movement:', request);
+    try {
+      const newMovement = await createMovement(request);
+      if (newMovement) {
+        console.log('Stock in created successfully:', newMovement);
+        alert('Stock in recorded successfully');
+        setIsStockInModalOpen(false);
+        // Refresh stock data to reflect changes
+        fetchStocks();
+      }
+    } catch (error) {
+      console.error('Failed to create stock in movement:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Failed to record stock in';
+      alert(`Error: ${errorMessage}`);
+    }
+  };
+
+  const handleStockOutSave = async (request: CreateMovementRequest) => {
+    console.log('Creating stock out movement:', request);
+    try {
+      const newMovement = await createMovement(request);
+      if (newMovement) {
+        console.log('Stock out created successfully:', newMovement);
+        alert('Stock out recorded successfully');
+        setIsStockOutModalOpen(false);
+        // Refresh stock data to reflect changes
+        fetchStocks();
+      }
+    } catch (error) {
+      console.error('Failed to create stock out movement:', error);
+      alert('Failed to record stock out');
+    }
+  };
+
+  const handleDeleteMovement = async (id: string) => {
+    if (confirm('Are you sure you want to delete this movement?')) {
+      try {
+        const success = await deleteMovement(id);
+        if (success) {
+          alert('Movement deleted successfully');
+          // Refresh stock data to reflect changes
+          fetchStocks();
+        }
+      } catch (error) {
+        console.error('Failed to delete movement:', error);
+        alert('Failed to delete movement');
+      }
+    }
+  };
+
+  const handleViewMovement = (movement: any) => {
+    console.log('Viewing movement:', movement);
+    alert(`Viewing movement: ${movement.id}`);
   };
 
   return (
@@ -529,7 +624,7 @@ export default function InventoryPage() {
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="all">All Locations</SelectItem>
-                          {locations.map(location => (
+                          {inventoryLocations.map(location => (
                             <SelectItem key={location} value={location}>
                               {location}
                             </SelectItem>
@@ -604,7 +699,15 @@ export default function InventoryPage() {
                       </div>
                     </div>
                   ) : (
-                    <MovementsList movements={movements} />
+                    <MovementsList 
+                      movements={movements}
+                      loading={movementsLoading}
+                      onRefresh={refreshMovements}
+                      onDelete={handleDeleteMovement}
+                      onView={handleViewMovement}
+                      onCreateStockIn={() => setIsStockInModalOpen(true)}
+                      onCreateStockOut={() => setIsStockOutModalOpen(true)}
+                    />
                   )}
                 </div>
               </TabsContent>
@@ -628,7 +731,11 @@ export default function InventoryPage() {
                       </div>
                     </div>
                   ) : (
-                    <AdjustmentsList adjustments={adjustments} />
+                    <AdjustmentsList 
+                      adjustments={adjustments}
+                      loading={adjustmentsLoading}
+                      showStats={false}
+                    />
                   )}
                 </div>
               </TabsContent>
@@ -725,6 +832,24 @@ export default function InventoryPage() {
             />
           </DialogContent>
         </Dialog>
+
+        {/* Stock In Modal */}
+        <StockInModal
+          isOpen={isStockInModalOpen}
+          onClose={() => setIsStockInModalOpen(false)}
+          onSave={handleStockInSave}
+          locations={locations.length > 0 ? locations : ['Main Warehouse']}
+          suppliers={suppliers}
+        />
+
+        {/* Stock Out Modal */}
+        <StockOutModal
+          isOpen={isStockOutModalOpen}
+          onClose={() => setIsStockOutModalOpen(false)}
+          onSave={handleStockOutSave}
+          locations={locations.length > 0 ? locations : ['Main Warehouse']}
+          customers={['Tech Solutions Inc', 'Digital Corp', 'Innovation Labs', 'Future Systems']}
+        />
       </div>
     </SidebarLayout>
   );

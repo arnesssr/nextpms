@@ -5,28 +5,34 @@ export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const product_id = searchParams.get('product_id');
-    const movement_type = searchParams.get('movement_type');
-    const location_id = searchParams.get('location_id');
+    const type = searchParams.get('type');
+    const reason = searchParams.get('reason');
+    const status = searchParams.get('status');
+    const location = searchParams.get('location');
+    const user_id = searchParams.get('user_id');
+    const search = searchParams.get('search');
     const days = parseInt(searchParams.get('days') || '30');
     const limit = parseInt(searchParams.get('limit') || '100');
 
-    console.log('Fetching movements with params:', { product_id, movement_type, location_id, days, limit });
+    console.log('Fetching adjustments with params:', { 
+      product_id, type, reason, status, location, user_id, search, days, limit 
+    });
 
-    // First check if stock_movements table exists
+    // First check if adjustments table exists
     const { data: testData, error: testError } = await supabase
-      .from('stock_movements')
+      .from('stock_adjustments')
       .select('id')
       .limit(1);
 
     if (testError) {
-      console.error('Error testing stock_movements table:', testError);
+      console.error('Error testing stock_adjustments table:', testError);
       // Table might not exist, let's return empty data for now
       return NextResponse.json([]);
     }
 
-    // Get recent stock movements from the stock_movements table
+    // Get adjustments from the stock_adjustments table
     let query = supabase
-      .from('stock_movements')
+      .from('stock_adjustments')
       .select(`
         *,
         products (
@@ -42,11 +48,23 @@ export async function GET(request: NextRequest) {
     if (product_id) {
       query = query.eq('product_id', product_id);
     }
-    if (movement_type) {
-      query = query.eq('movement_type', movement_type);
+    if (type) {
+      query = query.eq('adjustment_type', type);
     }
-    if (location_id) {
-      query = query.or(`location_to_id.eq.${location_id},location_from_id.eq.${location_id}`);
+    if (reason) {
+      query = query.eq('reason', reason);
+    }
+    if (status) {
+      query = query.eq('status', status);
+    }
+    if (location) {
+      query = query.eq('location', location);
+    }
+    if (user_id) {
+      query = query.eq('created_by', user_id);
+    }
+    if (search) {
+      query = query.or(`products.name.ilike.%${search}%,products.sku.ilike.%${search}%,reference.ilike.%${search}%,notes.ilike.%${search}%`);
     }
     
     // Filter by date range (last X days)
@@ -59,9 +77,9 @@ export async function GET(request: NextRequest) {
     const { data, error } = await query;
 
     if (error) {
-      console.error('Error fetching movements:', error);
+      console.error('Error fetching adjustments:', error);
       return NextResponse.json(
-        { error: 'Failed to fetch stock movements' },
+        { error: 'Failed to fetch adjustments' },
         { status: 500 }
       );
     }
@@ -79,7 +97,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    console.log('Received movement creation request:', body);
+    console.log('Received adjustment creation request:', body);
     
     // Validate required fields
     if (!body.product_id) {
@@ -89,16 +107,16 @@ export async function POST(request: NextRequest) {
       );
     }
     
-    if (!body.movement_type) {
+    if (!body.adjustment_type) {
       return NextResponse.json(
-        { error: 'Movement type is required' },
+        { error: 'Adjustment type is required' },
         { status: 400 }
       );
     }
     
-    if (!body.quantity || body.quantity <= 0) {
+    if (body.quantity_after === undefined || body.quantity_before === undefined) {
       return NextResponse.json(
-        { error: 'Valid quantity is required' },
+        { error: 'Both quantity_before and quantity_after are required' },
         { status: 400 }
       );
     }
@@ -127,30 +145,30 @@ export async function POST(request: NextRequest) {
     
     console.log('Product found:', productExists);
     
-    // Create stock movement record directly
-    const movementData = {
+    // Calculate quantity change
+    const quantityChange = body.quantity_after - body.quantity_before;
+    
+    // Create adjustment record
+    const adjustmentData = {
       product_id: body.product_id,
-      movement_type: body.movement_type,
-      quantity: parseInt(body.quantity),
+      adjustment_type: body.adjustment_type,
       reason: body.reason,
-      location_to_id: body.location_to_id || 'main_warehouse',
-      location_to_name: body.location_to_name || 'Main Warehouse',
-      location_from_id: body.location_from_id || null,
-      location_from_name: body.location_from_name || null,
-      unit_cost: parseFloat(body.unit_cost) || 0,
-      reference_type: body.reference_type || null,
-      reference_id: body.reference_id || null,
-      reference_number: body.reference_number || null,
+      quantity_before: parseInt(body.quantity_before),
+      quantity_after: parseInt(body.quantity_after),
+      quantity_change: quantityChange,
+      location: body.location || 'Main Warehouse',
+      reference: body.reference || null,
       notes: body.notes || null,
       created_by: body.created_by || 'system',
-      status: body.auto_process ? 'completed' : 'pending'
+      status: body.status || 'pending',
+      cost_impact: body.cost_impact || 0
     };
     
-    console.log('Attempting to create movement with data:', movementData);
+    console.log('Attempting to create adjustment with data:', adjustmentData);
 
     const { data, error } = await supabase
-      .from('stock_movements')
-      .insert(movementData)
+      .from('stock_adjustments')
+      .insert(adjustmentData)
       .select(`
         *,
         products (
@@ -162,7 +180,7 @@ export async function POST(request: NextRequest) {
       .single();
 
     if (error) {
-      console.error('Supabase error creating movement:', error);
+      console.error('Supabase error creating adjustment:', error);
       console.error('Error details:', {
         message: error.message,
         details: error.details,
@@ -173,7 +191,7 @@ export async function POST(request: NextRequest) {
       // Provide more specific error messages
       if (error.code === '23503') {
         return NextResponse.json(
-          { error: 'Invalid foreign key reference. Please check product ID and location.' },
+          { error: 'Invalid foreign key reference. Please check product ID.' },
           { status: 400 }
         );
       }
@@ -187,7 +205,7 @@ export async function POST(request: NextRequest) {
       
       return NextResponse.json(
         { 
-          error: 'Failed to create stock movement', 
+          error: 'Failed to create adjustment', 
           details: error.message,
           code: error.code 
         },
@@ -195,10 +213,10 @@ export async function POST(request: NextRequest) {
       );
     }
     
-    console.log('Movement created successfully:', data);
+    console.log('Adjustment created successfully:', data);
     return NextResponse.json(data, { status: 201 });
   } catch (error) {
-    console.error('Unexpected error in movement creation:', error);
+    console.error('Unexpected error in adjustment creation:', error);
     return NextResponse.json(
       { 
         error: 'Internal server error',
