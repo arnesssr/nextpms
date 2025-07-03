@@ -93,31 +93,6 @@ export default function MovementsPage() {
               Track all stock in and out movements with detailed history
             </p>
           </div>
-          <div className="flex space-x-2">
-            <Button 
-              variant="outline" 
-              onClick={handleRefresh}
-              disabled={loading}
-            >
-              <RefreshCw className={`mr-2 h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-              Refresh
-            </Button>
-            <Button 
-              variant="outline" 
-              onClick={() => setIsStockOutModalOpen(true)}
-              disabled={creating}
-            >
-              <ArrowDown className="mr-2 h-4 w-4" />
-              Stock Out
-            </Button>
-            <Button 
-              onClick={() => setIsStockInModalOpen(true)}
-              disabled={creating}
-            >
-              <ArrowUp className="mr-2 h-4 w-4" />
-              Stock In
-            </Button>
-          </div>
         </div>
 
 
@@ -141,6 +116,8 @@ export default function MovementsPage() {
           onFilter={setFilter}
           onDelete={handleDeleteMovement}
           onView={handleViewMovement}
+          onCreateStockIn={() => setIsStockInModalOpen(true)}
+          onCreateStockOut={() => setIsStockOutModalOpen(true)}
           showStats={false} // We have summary cards above
         />
 

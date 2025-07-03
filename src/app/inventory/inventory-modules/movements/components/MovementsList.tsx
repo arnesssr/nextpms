@@ -13,7 +13,10 @@ import {
   Filter, 
   RefreshCw, 
   Download,
-  X
+  X,
+  ArrowUp,
+  ArrowDown,
+  Plus
 } from 'lucide-react';
 import { format, subDays, startOfDay, endOfDay } from 'date-fns';
 
@@ -25,7 +28,8 @@ interface MovementsListProps {
   onDelete?: (id: string) => void;
   onView?: (movement: Movement) => void;
   showStats?: boolean;
-  compact?: boolean;
+  onCreateStockIn?: () => void;
+  onCreateStockOut?: () => void;
 }
 
 export function MovementsList({
@@ -36,7 +40,8 @@ export function MovementsList({
   onDelete,
   onView,
   showStats = true,
-  compact = false
+  onCreateStockIn,
+  onCreateStockOut
 }: MovementsListProps) {
   const [searchTerm, setSearchTerm] = useState('');
   const [typeFilter, setTypeFilter] = useState<MovementType | 'all'>('all');
@@ -222,6 +227,27 @@ export function MovementsList({
                 <Download className="h-4 w-4 mr-2" />
                 Export
               </Button>
+              {onCreateStockOut && (
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={onCreateStockOut}
+                  className="text-red-600 hover:text-red-700 border-red-200 hover:border-red-300"
+                >
+                  <ArrowDown className="h-4 w-4 mr-2" />
+                  Stock Out
+                </Button>
+              )}
+              {onCreateStockIn && (
+                <Button 
+                  size="sm" 
+                  onClick={onCreateStockIn}
+                  className="bg-green-600 hover:bg-green-700"
+                >
+                  <ArrowUp className="h-4 w-4 mr-2" />
+                  Stock In
+                </Button>
+              )}
             </div>
           </div>
         </CardHeader>
@@ -342,7 +368,6 @@ export function MovementsList({
                   movement={movement}
                   onDelete={onDelete}
                   onView={onView}
-                  compact={compact}
                 />
               ))
             )}
