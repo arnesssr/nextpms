@@ -30,7 +30,8 @@ import {
   CheckCircle,
   Clock,
   ShoppingCart,
-  RotateCcw
+  RotateCcw,
+  Building2
 } from 'lucide-react';
 import { InventoryItem, Product } from '@/types';
 
@@ -41,15 +42,26 @@ import { MovementsList } from './inventory-modules/movements/components/Movement
 import { StockInModal } from './inventory-modules/movements/components/StockInModal';
 import { StockOutModal } from './inventory-modules/movements/components/StockOutModal';
 import StockList from './inventory-modules/stock/components/StockList';
+import { WarehouseList } from './inventory-modules/warehouses/components/WarehouseList';
 
 // Import hooks
 import { useAdjustments } from './inventory-modules/adjustments/hooks/useAdjustments';
 import { useMovements } from './inventory-modules/movements/hooks/useMovements';
 import { useStock } from './inventory-modules/stock/hooks/useStock';
+import { useDefaultWarehouse } from './inventory-modules/warehouses/hooks/useWarehouses';
 
 // Import types
 import { CreateAdjustmentRequest } from './inventory-modules/adjustments/types/adjustments.types';
 import { CreateMovementRequest } from './inventory-modules/movements/types/movements.types';
+import { Warehouse } from './inventory-modules/warehouses/types/warehouse.types';
+// Import dialog components
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 
 export default function InventoryPage() {
   const [searchTerm, setSearchTerm] = useState('');
@@ -57,17 +69,31 @@ export default function InventoryPage() {
   const [locationFilter, setLocationFilter] = useState('all');
   const [isAdjustmentModalOpen, setIsAdjustmentModalOpen] = useState(false);
   const [selectedItem, setSelectedItem] = useState<InventoryItem | null>(null);
+  const [isEditStockModalOpen, setIsEditStockModalOpen] = useState(false);
+  const [selectedStock, setSelectedStock] = useState<any>(null);
+  const [selectedWarehouseId, setSelectedWarehouseId] = useState<string>('all');
+  const [selectedWarehouse, setSelectedWarehouse] = useState<Warehouse | null>(null);
+  const [isWarehouseManagementOpen, setIsWarehouseManagementOpen] = useState(false);
 
   // Use hooks for module data
   const { stocks, loading: stocksLoading, error: stocksError, fetchStocks } = useStock();
   const { adjustments, loading: adjustmentsLoading, error: adjustmentsError } = useAdjustments();
   const { movements, loading: movementsLoading, error: movementsError } = useMovements();
+  const { defaultWarehouse, loading: defaultWarehouseLoading } = useDefaultWarehouse();
 
   // Load data on component mount
   useEffect(() => {
     console.log('InventoryPage: Component mounted, calling fetchStocks');
     fetchStocks();
   }, []); // Empty dependency array to run only once on mount
+
+  // Set default warehouse when loaded
+  useEffect(() => {
+    if (defaultWarehouse && selectedWarehouseId === 'all') {
+      setSelectedWarehouseId(defaultWarehouse.id);
+      setSelectedWarehouse(defaultWarehouse);
+    }
+  }, [defaultWarehouse, selectedWarehouseId]);
 
   // Debug log when stocks data changes
   useEffect(() => {
@@ -167,6 +193,53 @@ export default function InventoryPage() {
     setSelectedItem(null);
   };
 
+  // Stock action handlers
+  const handleEditStock = (stock: any) => {
+    setSelectedStock(stock);
+    setIsEditStockModalOpen(true);
+    console.log('Edit stock:', stock);
+  };
+
+  const handleDeleteStock = async (stockId: string) => {
+    if (window.confirm('Are you sure you want to delete this stock item?')) {
+      try {
+        // Call the stock service to delete
+        // await StockService.deleteStock(stockId);
+        console.log('Delete stock with ID:', stockId);
+        // Refresh the stocks after deletion
+        fetchStocks();
+      } catch (error) {
+        console.error('Failed to delete stock:', error);
+        alert('Failed to delete stock item. Please try again.');
+      }
+    }
+  };
+
+  const handleViewStock = (stock: any) => {
+    console.log('View stock details:', stock);
+    // Navigate to stock detail view or open modal
+    alert(`Viewing details for ${stock.productName} (SKU: ${stock.productSku})\n\nCurrent Stock: ${stock.currentQuantity} ${stock.unitOfMeasure}\nLocation: ${stock.location}\nValue: $${stock.totalValue?.toLocaleString() || '0'}`);
+  };
+
+  const handleEditStockModalClose = () => {
+    setIsEditStockModalOpen(false);
+    setSelectedStock(null);
+  };
+
+  // Warehouse change handler
+  const handleWarehouseChange = (warehouseId: string, warehouse: Warehouse | null) => {
+    console.log('Warehouse changed:', warehouseId, warehouse);
+    setSelectedWarehouseId(warehouseId);
+    setSelectedWarehouse(warehouse);
+    
+    // Fetch stocks for the selected warehouse
+    if (warehouseId === 'all') {
+      fetchStocks();
+    } else {
+      fetchStocks({ warehouseId });
+    }
+  };
+
   // Get unique locations for filter
   const locations = [...new Set(enhancedInventory.map(item => item.location))];
 
@@ -189,6 +262,12 @@ export default function InventoryPage() {
             <Button variant="outline">
               <Download className="mr-2 h-4 w-4" />
               Export
+            </Button>
+            <Button variant="outline" onClick={() => {
+              setIsWarehouseManagementOpen(true);
+            }}>
+              <Building2 className="mr-2 h-4 w-4" />
+              Warehouses
             </Button>
             <Button variant="outline" onClick={() => {
               // TODO: Implement auto reorder functionality
@@ -388,7 +467,14 @@ export default function InventoryPage() {
                       </div>
                     </div>
                   ) : (
-                    <StockList stocks={stocks} />
+                    <StockList 
+                      stocks={stocks} 
+                      onEdit={handleEditStock}
+                      onDelete={handleDeleteStock}
+                      onView={handleViewStock}
+                      selectedWarehouseId={selectedWarehouseId}
+                      onWarehouseChange={handleWarehouseChange}
+                    />
                   )}
                 </div>
               </TabsContent>
@@ -471,6 +557,29 @@ export default function InventoryPage() {
           item={selectedItem}
           products={[]}
         />
+
+        {/* Warehouse Management Modal */}
+        <Dialog open={isWarehouseManagementOpen} onOpenChange={setIsWarehouseManagementOpen}>
+          <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle className="flex items-center space-x-2">
+                <Building2 className="h-5 w-5 text-blue-600" />
+                <span>Warehouse Management</span>
+              </DialogTitle>
+              <DialogDescription>
+                Manage your warehouse locations, view inventory distribution, and configure settings.
+              </DialogDescription>
+            </DialogHeader>
+            <WarehouseList 
+              selectedWarehouseId={selectedWarehouseId}
+              onWarehouseSelect={(warehouse) => {
+                setSelectedWarehouseId(warehouse.id);
+                setSelectedWarehouse(warehouse);
+                console.log('Selected warehouse:', warehouse);
+              }}
+            />
+          </DialogContent>
+        </Dialog>
       </div>
     </SidebarLayout>
   );

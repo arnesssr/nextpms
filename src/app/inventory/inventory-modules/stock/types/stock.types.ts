@@ -5,7 +5,7 @@ export interface Stock {
   productSku: string;
   currentQuantity: number;
   minimumQuantity: number;
-  maximumQuantity: number;
+  maximumQuantity: number | null;
   unitOfMeasure: string;
   location: string;
   warehouseId?: string;
@@ -16,6 +16,20 @@ export interface Stock {
   supplier?: string;
   expiryDate?: Date;
   batchNumber?: string;
+  lastRestocked?: Date | null;
+  notes?: string;
+  createdAt?: string;
+  updatedAt?: string;
+  // Extended properties for products integration
+  products?: {
+    name: string;
+    sku: string;
+    cost_price?: number;
+    selling_price?: number;
+    categories?: {
+      name: string;
+    };
+  };
 }
 
 export enum StockStatus {
@@ -41,6 +55,8 @@ export interface StockFilter {
   lowStock?: boolean;
   outOfStock?: boolean;
   expiringBefore?: Date;
+  // Add location_id for API compatibility
+  location_id?: string;
 }
 
 export interface CreateStockRequest {

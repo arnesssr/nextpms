@@ -16,19 +16,34 @@ export class StockService {
   private static transformApiResponseToStock(apiStock: any): Stock {
     const productData = apiStock.products || apiStock.product || {};
     
+    // Determine stock status based on quantity and thresholds
+    const currentQty = apiStock.quantity || apiStock.quantity_on_hand || 0;
+    const minQty = apiStock.min_stock_level || apiStock.minStockLevel || 0;
+    const maxQty = apiStock.max_stock_level || apiStock.maxStockLevel || null;
+    
+    let stockStatus: StockStatus = 'in_stock';
+    if (currentQty === 0) {
+      stockStatus = 'out_of_stock';
+    } else if (minQty > 0 && currentQty <= minQty) {
+      stockStatus = 'low_stock';
+    } else if (maxQty && maxQty > 0 && currentQty >= maxQty) {
+      stockStatus = 'overstocked';
+    }
+    
     return {
       id: apiStock.id,
       productId: apiStock.product_id || apiStock.productId,
       productName: productData.name || apiStock.productName || 'Unknown Product',
       productSku: productData.sku || apiStock.productSku || 'N/A',
-      currentQuantity: apiStock.quantity || apiStock.quantity_on_hand || 0,
-      minimumQuantity: apiStock.min_stock_level || apiStock.minStockLevel || 0,
-      maximumQuantity: apiStock.max_stock_level || apiStock.maxStockLevel || null,
+      currentQuantity: currentQty,
+      minimumQuantity: minQty,
+      maximumQuantity: maxQty, // Keep null if not set
       unitOfMeasure: apiStock.unit_of_measure || apiStock.unitOfMeasure || 'units',
-      location: apiStock.location_name || apiStock.location || '',
-      costPerUnit: apiStock.cost_per_unit || apiStock.costPerUnit || 0,
-      totalValue: (apiStock.cost_per_unit || apiStock.costPerUnit || 0) * (apiStock.quantity || apiStock.quantity_on_hand || 0),
-      status: apiStock.status as StockStatus || 'in_stock',
+      location: apiStock.location_name || apiStock.location || 'Main Warehouse',
+      warehouseId: apiStock.location_id || apiStock.warehouseId,
+      costPerUnit: (productData.cost_price || apiStock.cost_per_unit || apiStock.costPerUnit || 0),
+      totalValue: (productData.cost_price || apiStock.cost_per_unit || apiStock.costPerUnit || 0) * currentQty,
+      status: stockStatus,
       lastUpdated: apiStock.updated_at ? new Date(apiStock.updated_at) : (apiStock.lastUpdated ? new Date(apiStock.lastUpdated) : new Date()),
       lastRestocked: apiStock.last_restocked || apiStock.lastRestocked || null,
       notes: apiStock.notes || '',
@@ -45,7 +60,12 @@ export class StockService {
       if (filters) {
         Object.entries(filters).forEach(([key, value]) => {
           if (value !== undefined && value !== null) {
-            queryParams.append(key, value.toString());
+            // Handle warehouse filtering
+            if (key === 'warehouseId' && value !== 'all') {
+              queryParams.append('location_id', value.toString());
+            } else if (key !== 'warehouseId') {
+              queryParams.append(key, value.toString());
+            }
           }
         });
       }

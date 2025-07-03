@@ -4,6 +4,8 @@ import { useState } from 'react';
 import { Stock } from '../types/stock.types';
 import { useStockFilters } from '../hooks/useStockFilters';
 import StockCard from './StockCard';
+import WarehouseSelector from '@/components/warehouse/WarehouseSelector';
+import { Warehouse } from '../../warehouses/types/warehouse.types';
 
 interface StockListProps {
   stocks: Stock[];
@@ -12,6 +14,8 @@ interface StockListProps {
   onDelete?: (stockId: string) => void;
   onView?: (stock: Stock) => void;
   viewMode?: 'table' | 'cards';
+  selectedWarehouseId?: string;
+  onWarehouseChange?: (warehouseId: string, warehouse: Warehouse | null) => void;
 }
 
 export default function StockList({ 
@@ -20,7 +24,9 @@ export default function StockList({
   onEdit, 
   onDelete, 
   onView,
-  viewMode = 'table'
+  viewMode = 'table',
+  selectedWarehouseId,
+  onWarehouseChange
 }: StockListProps) {
   const [currentViewMode, setCurrentViewMode] = useState<'table' | 'cards'>(viewMode);
   
@@ -117,19 +123,30 @@ export default function StockList({
             Expiring Soon
           </button>
 
-          {/* Location Filter */}
-          <select
-            value={filters.location || ''}
-            onChange={(e) => updateFilter('location', e.target.value || undefined)}
-            className="px-3 py-1 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-          >
-            <option value="">All Locations</option>
-            {filterOptions.locations.map((location) => (
-              <option key={location} value={location}>
-                {location}
-              </option>
-            ))}
-          </select>
+          {/* Warehouse Filter */}
+          {onWarehouseChange ? (
+            <WarehouseSelector
+              selectedWarehouseId={selectedWarehouseId}
+              onWarehouseChange={onWarehouseChange}
+              placeholder="All Warehouses"
+              allowAll={true}
+              showStats={false}
+              className="min-w-[180px]"
+            />
+          ) : (
+            <select
+              value={filters.location || ''}
+              onChange={(e) => updateFilter('location', e.target.value || undefined)}
+              className="px-3 py-1 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            >
+              <option value="">All Locations</option>
+              {filterOptions.locations.map((location) => (
+                <option key={location} value={location}>
+                  {location}
+                </option>
+              ))}
+            </select>
+          )}
 
           {/* Clear Filters */}
           {filterSummary.isActive && (
@@ -214,7 +231,7 @@ export default function StockList({
                       {stock.currentQuantity} {stock.unitOfMeasure}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {stock.minimumQuantity} / {stock.maximumQuantity}
+                      {stock.minimumQuantity} / {stock.maximumQuantity || 'Not Set'}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                       {stock.location}
