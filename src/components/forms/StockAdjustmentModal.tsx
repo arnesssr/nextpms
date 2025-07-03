@@ -162,7 +162,7 @@ export function StockAdjustmentModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl">
+      <DialogContent className="max-w-2xl max-h-[85vh] flex flex-col">
         <DialogHeader>
           <DialogTitle>
             {item ? 'Adjust Stock Level' : 'Stock Adjustment'}
@@ -175,7 +175,8 @@ export function StockAdjustmentModal({
           </DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+        <div className="flex-1 overflow-y-auto pr-2">
+          <form onSubmit={handleSubmit(onSubmit)} className="space-y-6" id="stock-adjustment-form">
           {/* Product Selection */}
           {!item && (
             <div className="space-y-2">
@@ -364,19 +365,22 @@ export function StockAdjustmentModal({
             </Card>
           )}
 
-          {/* Form Actions */}
-          <div className="flex items-center justify-end space-x-2 pt-4 border-t">
-            <Button type="button" variant="outline" onClick={onClose}>
-              Cancel
-            </Button>
-            <Button 
-              type="submit" 
-              disabled={isSubmitting || !selectedProduct}
-            >
-              {isSubmitting ? 'Adjusting...' : 'Apply Adjustment'}
-            </Button>
-          </div>
-        </form>
+          </form>
+        </div>
+        
+        {/* Sticky Form Actions */}
+        <div className="flex items-center justify-end space-x-2 pt-4 border-t bg-white">
+          <Button type="button" variant="outline" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button 
+            type="submit"
+            form="stock-adjustment-form"
+            disabled={isSubmitting || !selectedProduct}
+          >
+            {isSubmitting ? 'Adjusting...' : 'Apply Adjustment'}
+          </Button>
+        </div>
       </DialogContent>
     </Dialog>
   );

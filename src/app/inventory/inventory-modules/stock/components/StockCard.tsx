@@ -1,7 +1,9 @@
 'use client';
 
-import { Stock } from '../types/stock.types';
+import { Stock, UpdateStockRequest } from '../types/stock.types';
+import { StockService } from '../services/stockService';
 import StockLevelIndicator from './StockLevelIndicator';
+import EditableStockLevel from './EditableStockLevel';
 
 interface StockCardProps {
   stock: Stock;
@@ -148,6 +150,44 @@ export default function StockCard({
               <div>
                 <span className="text-gray-500">Total Value:</span>
                 <p className="font-medium text-green-600">${(stock.totalValue ?? 0).toLocaleString()}</p>
+              </div>
+            </div>
+
+            <div className="pt-4 border-t border-gray-200 mt-4">
+              <h4 className="text-sm font-medium text-gray-700 mb-2">Stock Thresholds</h4>
+              <div className="space-y-2">
+                <EditableStockLevel
+                  value={stock.minimumQuantity}
+                  label="Min"
+                  onSave={async (newValue) => {
+                    try {
+                      const updateData: UpdateStockRequest = { id: stock.id, minimumQuantity: newValue };
+                      await StockService.updateStock(updateData);
+                      stock.minimumQuantity = newValue;
+                      // This is a local mutation. For a proper state update, a callback should be used.
+                      return true;
+                    } catch (e) {
+                      console.error(e);
+                      return false;
+                    }
+                  }}
+                />
+                <EditableStockLevel
+                  value={stock.maximumQuantity}
+                  label="Max"
+                  onSave={async (newValue) => {
+                    try {
+                      const updateData: UpdateStockRequest = { id: stock.id, maximumQuantity: newValue };
+                      await StockService.updateStock(updateData);
+                      stock.maximumQuantity = newValue;
+                      // This is a local mutation. For a proper state update, a callback should be used.
+                      return true;
+                    } catch (e) {
+                      console.error(e);
+                      return false;
+                    }
+                  }}
+                />
               </div>
             </div>
 

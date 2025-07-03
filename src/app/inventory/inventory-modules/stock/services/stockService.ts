@@ -17,7 +17,7 @@ export class StockService {
     const productData = apiStock.products || apiStock.product || {};
     
     // Determine stock status based on quantity and thresholds
-    const currentQty = apiStock.quantity || apiStock.quantity_on_hand || 0;
+    const currentQty = apiStock.quantity_available || apiStock.quantity || apiStock.quantity_on_hand || 0;
     const minQty = apiStock.min_stock_level || apiStock.minStockLevel || 0;
     const maxQty = apiStock.max_stock_level || apiStock.maxStockLevel || null;
     
@@ -30,6 +30,14 @@ export class StockService {
       stockStatus = 'overstocked';
     }
     
+    // Enhanced cost calculation with fallback logic
+    const unitCost = apiStock.unit_cost || 
+                     productData.cost_price || 
+                     apiStock.cost_per_unit || 
+                     apiStock.costPerUnit || 
+                     productData.selling_price || // Fallback to selling price if no cost available
+                     0;
+    
     return {
       id: apiStock.id,
       productId: apiStock.product_id || apiStock.productId,
@@ -41,8 +49,8 @@ export class StockService {
       unitOfMeasure: apiStock.unit_of_measure || apiStock.unitOfMeasure || 'units',
       location: apiStock.location_name || apiStock.location || 'Main Warehouse',
       warehouseId: apiStock.location_id || apiStock.warehouseId,
-      costPerUnit: (productData.cost_price || apiStock.cost_per_unit || apiStock.costPerUnit || 0),
-      totalValue: (productData.cost_price || apiStock.cost_per_unit || apiStock.costPerUnit || 0) * currentQty,
+      costPerUnit: unitCost,
+      totalValue: unitCost * currentQty,
       status: stockStatus,
       lastUpdated: apiStock.updated_at ? new Date(apiStock.updated_at) : (apiStock.lastUpdated ? new Date(apiStock.lastUpdated) : new Date()),
       lastRestocked: apiStock.last_restocked || apiStock.lastRestocked || null,
@@ -130,19 +138,47 @@ export class StockService {
   // Update existing stock
   static async updateStock(stockData: UpdateStockRequest): Promise<Stock> {
     try {
-      const response = await fetch(`${API_BASE_URL}/inventory/${stockData.id}`, {
+      // Map the frontend field names to database field names
+      const { id, ...updateFields } = stockData;
+      const mappedFields: any = {};
+      
+      if (updateFields.minimumQuantity !== undefined) {
+        mappedFields.min_stock_level = updateFields.minimumQuantity;
+      }
+      if (updateFields.maximumQuantity !== undefined) {
+        mappedFields.max_stock_level = updateFields.maximumQuantity;
+      }
+      if (updateFields.currentQuantity !== undefined) {
+        mappedFields.quantity_on_hand = updateFields.currentQuantity;
+      }
+      if (updateFields.costPerUnit !== undefined) {
+        mappedFields.unit_cost = updateFields.costPerUnit;
+      }
+      if (updateFields.location !== undefined) {
+        mappedFields.location_name = updateFields.location;
+      }
+      if (updateFields.warehouseId !== undefined) {
+        mappedFields.location_id = updateFields.warehouseId;
+      }
+      
+      console.log('Updating stock with mapped fields:', mappedFields);
+      
+      const response = await fetch(`${API_BASE_URL}/inventory/${id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(stockData),
+        body: JSON.stringify(mappedFields),
       });
       
       if (!response.ok) {
+        const errorText = await response.text();
+        console.error('API Error Response:', errorText);
         throw new Error(`Failed to update stock: ${response.statusText}`);
       }
       
-      return response.json();
+      const result = await response.json();
+      return this.transformApiResponseToStock(result);
     } catch (error) {
       console.error('Error updating stock:', error);
       throw error;

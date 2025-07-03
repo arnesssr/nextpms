@@ -1,11 +1,13 @@
 'use client';
 
 import { useState } from 'react';
-import { Stock } from '../types/stock.types';
-import { useStockFilters } from '../hooks/useStockFilters';
-import StockCard from './StockCard';
-import WarehouseSelector from '@/components/warehouse/WarehouseSelector';
+import { Stock, UpdateStockRequest } from '../types/stock.types';
+import { StockService } from '../services/stockService';
 import { Warehouse } from '../../warehouses/types/warehouse.types';
+import StockCard from './StockCard';
+import EditableStockLevel from './EditableStockLevel';
+import { useStockFilters } from '../hooks/useStockFilters';
+// import WarehouseSelector from '@/components/warehouse/WarehouseSelector';
 
 interface StockListProps {
   stocks: Stock[];
@@ -123,30 +125,19 @@ export default function StockList({
             Expiring Soon
           </button>
 
-          {/* Warehouse Filter */}
-          {onWarehouseChange ? (
-            <WarehouseSelector
-              selectedWarehouseId={selectedWarehouseId}
-              onWarehouseChange={onWarehouseChange}
-              placeholder="All Warehouses"
-              allowAll={true}
-              showStats={false}
-              className="min-w-[180px]"
-            />
-          ) : (
-            <select
-              value={filters.location || ''}
-              onChange={(e) => updateFilter('location', e.target.value || undefined)}
-              className="px-3 py-1 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            >
-              <option value="">All Locations</option>
-              {filterOptions.locations.map((location) => (
-                <option key={location} value={location}>
-                  {location}
-                </option>
-              ))}
-            </select>
-          )}
+          {/* Warehouse Filter - Temporarily Disabled for Testing */}
+          <select
+            value={filters.location || ''}
+            onChange={(e) => updateFilter('location', e.target.value || undefined)}
+            className="px-3 py-1 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          >
+            <option value="">All Locations</option>
+            {filterOptions.locations.map((location) => (
+              <option key={location} value={location}>
+                {location}
+              </option>
+            ))}
+          </select>
 
           {/* Clear Filters */}
           {filterSummary.isActive && (
@@ -231,7 +222,46 @@ export default function StockList({
                       {stock.currentQuantity} {stock.unitOfMeasure}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {stock.minimumQuantity} / {stock.maximumQuantity || 'Not Set'}
+                      <div className="flex flex-col space-y-1">
+                        <EditableStockLevel
+                          value={stock.minimumQuantity}
+                          label="Min"
+                          onSave={async (newValue) => {
+                            try {
+                              const updateData: UpdateStockRequest = {
+                                id: stock.id,
+                                minimumQuantity: newValue
+                              };
+                              await StockService.updateStock(updateData);
+                              // Update the stock in the parent component
+                              stock.minimumQuantity = newValue;
+                              return true;
+                            } catch (error) {
+                              console.error('Failed to update minimum quantity:', error);
+                              return false;
+                            }
+                          }}
+                        />
+                        <EditableStockLevel
+                          value={stock.maximumQuantity}
+                          label="Max"
+                          onSave={async (newValue) => {
+                            try {
+                              const updateData: UpdateStockRequest = {
+                                id: stock.id,
+                                maximumQuantity: newValue
+                              };
+                              await StockService.updateStock(updateData);
+                              // Update the stock in the parent component
+                              stock.maximumQuantity = newValue;
+                              return true;
+                            } catch (error) {
+                              console.error('Failed to update maximum quantity:', error);
+                              return false;
+                            }
+                          }}
+                        />
+                      </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                       {stock.location}

@@ -174,9 +174,37 @@ export const useDefaultWarehouse = () => {
       const warehouses = await WarehouseService.getWarehouses();
       const defaultWh = warehouses.find(wh => wh.isDefault) || warehouses[0] || null;
       setDefaultWarehouse(defaultWh);
+      console.log('Default warehouse fetched successfully:', defaultWh);
     } catch (err) {
       console.error('Error fetching default warehouse:', err);
+      
+      // Create a fallback default warehouse to prevent blocking the UI
+      const fallbackWarehouse: Warehouse = {
+        id: 'main_warehouse',
+        name: 'Main Warehouse',
+        code: 'MAIN',
+        description: 'Default warehouse (fallback)',
+        address: {
+          street: '',
+          city: '',
+          state: '',
+          zipCode: '',
+          country: ''
+        },
+        contactInfo: {
+          phone: null,
+          email: null,
+          manager: null
+        },
+        isActive: true,
+        isDefault: true,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      };
+      
+      setDefaultWarehouse(fallbackWarehouse);
       setError(err instanceof Error ? err.message : 'Failed to fetch default warehouse');
+      console.log('Using fallback warehouse due to error:', fallbackWarehouse);
     } finally {
       setLoading(false);
     }

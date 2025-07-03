@@ -15,34 +15,53 @@ export class WarehouseService {
   
   // Transform API response to match Warehouse interface
   private static transformApiResponseToWarehouse(apiWarehouse: any): Warehouse {
-    return {
-      id: apiWarehouse.id,
-      name: apiWarehouse.name,
-      code: apiWarehouse.code,
-      description: apiWarehouse.description,
-      address: {
-        street: apiWarehouse.address?.street || apiWarehouse.street || '',
-        city: apiWarehouse.address?.city || apiWarehouse.city || '',
-        state: apiWarehouse.address?.state || apiWarehouse.state || '',
-        zipCode: apiWarehouse.address?.zipCode || apiWarehouse.zip_code || '',
-        country: apiWarehouse.address?.country || apiWarehouse.country || ''
-      },
-      contactInfo: {
-        phone: apiWarehouse.contact_info?.phone || apiWarehouse.phone,
-        email: apiWarehouse.contact_info?.email || apiWarehouse.email,
-        manager: apiWarehouse.contact_info?.manager || apiWarehouse.manager
-      },
-      isActive: apiWarehouse.is_active ?? apiWarehouse.isActive ?? true,
-      isDefault: apiWarehouse.is_default ?? apiWarehouse.isDefault ?? false,
-      capacity: apiWarehouse.capacity ? {
-        maxVolume: apiWarehouse.capacity.max_volume,
-        maxWeight: apiWarehouse.capacity.max_weight,
-        maxItems: apiWarehouse.capacity.max_items
-      } : undefined,
-      zones: apiWarehouse.zones?.map((zone: any) => this.transformApiResponseToZone(zone)),
-      createdAt: apiWarehouse.created_at || apiWarehouse.createdAt,
-      updatedAt: apiWarehouse.updated_at || apiWarehouse.updatedAt
-    };
+    console.log('Transforming warehouse API response:', apiWarehouse);
+    
+    try {
+      const result = {
+        id: apiWarehouse.id,
+        name: apiWarehouse.name,
+        code: apiWarehouse.code,
+        description: apiWarehouse.description,
+        address: {
+          street: apiWarehouse.address?.street || apiWarehouse.address_line1 || '',
+          city: apiWarehouse.address?.city || apiWarehouse.city || '',
+          state: apiWarehouse.address?.state || apiWarehouse.state || '',
+          zipCode: apiWarehouse.address?.zipCode || apiWarehouse.postal_code || '',
+          country: apiWarehouse.address?.country || apiWarehouse.country || ''
+        },
+        contactInfo: {
+          phone: apiWarehouse.contact_info?.phone || apiWarehouse.phone,
+          email: apiWarehouse.contact_info?.email || apiWarehouse.email,
+          manager: apiWarehouse.contact_info?.manager || apiWarehouse.manager_name
+        },
+        isActive: apiWarehouse.is_active ?? apiWarehouse.isActive ?? true,
+        isDefault: apiWarehouse.is_default ?? apiWarehouse.isDefault ?? false,
+        capacity: apiWarehouse.capacity ? {
+          maxVolume: apiWarehouse.capacity.max_volume,
+          maxWeight: apiWarehouse.capacity.max_weight,
+          maxItems: apiWarehouse.capacity.max_items
+        } : (apiWarehouse.max_capacity ? {
+          maxVolume: apiWarehouse.max_volume_m3,
+          maxWeight: apiWarehouse.max_weight_kg,
+          maxItems: apiWarehouse.max_capacity
+        } : undefined),
+        zones: apiWarehouse.zones?.map((zone: any) => this.transformApiResponseToZone(zone)),
+        createdAt: apiWarehouse.created_at || apiWarehouse.createdAt,
+        updatedAt: apiWarehouse.updated_at || apiWarehouse.updatedAt,
+        // Add missing properties that might be expected
+        totalInventoryItems: apiWarehouse.total_inventory_items || 0,
+        totalQuantity: apiWarehouse.total_quantity || 0,
+        totalInventoryValue: apiWarehouse.total_inventory_value || 0,
+        uniqueProducts: apiWarehouse.unique_products || 0
+      };
+      
+      console.log('Transformed warehouse result:', result);
+      return result;
+    } catch (error) {
+      console.error('Error transforming warehouse:', error, apiWarehouse);
+      throw error;
+    }
   }
 
   private static transformApiResponseToZone(apiZone: any): WarehouseZone {

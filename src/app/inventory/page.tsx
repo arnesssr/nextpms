@@ -54,6 +54,7 @@ import { useDefaultWarehouse } from './inventory-modules/warehouses/hooks/useWar
 import { CreateAdjustmentRequest } from './inventory-modules/adjustments/types/adjustments.types';
 import { CreateMovementRequest } from './inventory-modules/movements/types/movements.types';
 import { Warehouse } from './inventory-modules/warehouses/types/warehouse.types';
+import { StockService } from './inventory-modules/stock/services/stockService';
 // Import dialog components
 import {
   Dialog,
@@ -62,6 +63,11 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import BulkStockLevelsModal from './inventory-modules/stock/components/BulkStockLevelsModal';
+import StockDetailModal from './inventory-modules/stock/components/StockDetailModal';
+import StockEditModal from './inventory-modules/stock/components/StockEditModal';
+import PurchaseOrderModal from './inventory-modules/purchase-orders/components/PurchaseOrderModal';
+import AutoReorderModal from './inventory-modules/auto-reorder/components/AutoReorderModal';
 
 export default function InventoryPage() {
   const [searchTerm, setSearchTerm] = useState('');
@@ -74,12 +80,16 @@ export default function InventoryPage() {
   const [selectedWarehouseId, setSelectedWarehouseId] = useState<string>('all');
   const [selectedWarehouse, setSelectedWarehouse] = useState<Warehouse | null>(null);
   const [isWarehouseManagementOpen, setIsWarehouseManagementOpen] = useState(false);
+  const [isBulkModalOpen, setIsBulkModalOpen] = useState(false);
+  const [isStockDetailOpen, setIsStockDetailOpen] = useState(false);
+  const [selectedStockForView, setSelectedStockForView] = useState(null);
+  const [isPurchaseOrderModalOpen, setIsPurchaseOrderModalOpen] = useState(false);
 
   // Use hooks for module data
   const { stocks, loading: stocksLoading, error: stocksError, fetchStocks } = useStock();
   const { adjustments, loading: adjustmentsLoading, error: adjustmentsError } = useAdjustments();
   const { movements, loading: movementsLoading, error: movementsError } = useMovements();
-  const { defaultWarehouse, loading: defaultWarehouseLoading } = useDefaultWarehouse();
+  const { defaultWarehouse, loading: defaultWarehouseLoading, error: warehouseError } = useDefaultWarehouse();
 
   // Load data on component mount
   useEffect(() => {
@@ -197,17 +207,21 @@ export default function InventoryPage() {
   const handleEditStock = (stock: any) => {
     setSelectedStock(stock);
     setIsEditStockModalOpen(true);
-    console.log('Edit stock:', stock);
   };
 
   const handleDeleteStock = async (stockId: string) => {
-    if (window.confirm('Are you sure you want to delete this stock item?')) {
+    const stockItem = stocks.find(s => s.id === stockId);
+    const confirmMessage = stockItem 
+      ? `Are you sure you want to delete "${stockItem.productName}" (SKU: ${stockItem.productSku})?\n\nThis action cannot be undone.`
+      : 'Are you sure you want to delete this stock item? This action cannot be undone.';
+    
+    if (window.confirm(confirmMessage)) {
       try {
-        // Call the stock service to delete
-        // await StockService.deleteStock(stockId);
-        console.log('Delete stock with ID:', stockId);
+        await StockService.deleteStock(stockId);
+        console.log('Successfully deleted stock with ID:', stockId);
         // Refresh the stocks after deletion
         fetchStocks();
+        alert('Stock item deleted successfully.');
       } catch (error) {
         console.error('Failed to delete stock:', error);
         alert('Failed to delete stock item. Please try again.');
@@ -217,8 +231,8 @@ export default function InventoryPage() {
 
   const handleViewStock = (stock: any) => {
     console.log('View stock details:', stock);
-    // Navigate to stock detail view or open modal
-    alert(`Viewing details for ${stock.productName} (SKU: ${stock.productSku})\n\nCurrent Stock: ${stock.currentQuantity} ${stock.unitOfMeasure}\nLocation: ${stock.location}\nValue: $${stock.totalValue?.toLocaleString() || '0'}`);
+    setSelectedStockForView(stock);
+    setIsStockDetailOpen(true);
   };
 
   const handleEditStockModalClose = () => {
@@ -250,42 +264,38 @@ export default function InventoryPage() {
         <div className="flex items-center justify-between">
           <div>
             <h2 className="text-3xl font-bold tracking-tight">Inventory</h2>
-            <p className="text-muted-foreground">
-              Monitor and manage your stock levels
-            </p>
           </div>
           <div className="flex space-x-2">
-            <Button variant="outline">
-              <RefreshCw className="mr-2 h-4 w-4" />
-              Sync Stock
+            <Button variant="outline" title="Sync Stock">
+              <RefreshCw className="h-4 w-4" />
             </Button>
-            <Button variant="outline">
-              <Download className="mr-2 h-4 w-4" />
-              Export
+            <Button variant="outline" title="Export">
+              <Download className="h-4 w-4" />
             </Button>
             <Button variant="outline" onClick={() => {
               setIsWarehouseManagementOpen(true);
-            }}>
-              <Building2 className="mr-2 h-4 w-4" />
-              Warehouses
+            }} title="Warehouses">
+              <Building2 className="h-4 w-4" />
             </Button>
             <Button variant="outline" onClick={() => {
               // TODO: Implement auto reorder functionality
               console.log('Auto reorder triggered');
-            }}>
-              <RotateCcw className="mr-2 h-4 w-4" />
-              Auto Reorder
+            }} title="Auto Reorder">
+              <RotateCcw className="h-4 w-4" />
             </Button>
             <Button variant="outline" onClick={() => {
-              // TODO: Implement generate purchase orders functionality
-              console.log('Generate purchase orders triggered');
-            }}>
-              <ShoppingCart className="mr-2 h-4 w-4" />
-              Generate PO
+              console.log('Open Bulk Stock Levels Management');
+              setIsBulkModalOpen(true);
+            }} title="Manage Stock Levels">
+              <Settings className="h-4 w-4" />
             </Button>
-            <Button onClick={() => setIsAdjustmentModalOpen(true)}>
-              <Plus className="mr-2 h-4 w-4" />
-              Adjust Stock
+            <Button variant="outline" onClick={() => {
+              setIsPurchaseOrderModalOpen(true);
+            }} title="Generate Purchase Order">
+              <ShoppingCart className="h-4 w-4" />
+            </Button>
+            <Button onClick={() => setIsAdjustmentModalOpen(true)} title="Adjust Stock">
+              <Plus className="h-4 w-4" />
             </Button>
           </div>
         </div>
@@ -321,17 +331,6 @@ export default function InventoryPage() {
               
               <TabsContent value="overview" className="mt-6">
                 <div className="space-y-4">
-                  {/* Debug Info */}
-                  <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-                    <h4 className="font-semibold text-yellow-800">Debug Info:</h4>
-                    <div className="text-sm text-yellow-700 mt-2 space-y-1">
-                      <p>Stocks Loading: {stocksLoading ? 'Yes' : 'No'}</p>
-                      <p>Stocks Count: {stocks.length}</p>
-                      <p>Stocks Error: {stocksError || 'None'}</p>
-                      <p>Temp Products Count: {tempProducts.length}</p>
-                      <p>Temp Loading: {tempLoading ? 'Yes' : 'No'}</p>
-                    </div>
-                  </div>
                   
                   <div className="flex items-center justify-between">
                     <h3 className="text-lg font-semibold">Inventory Overview</h3>
@@ -437,15 +436,6 @@ export default function InventoryPage() {
               
               <TabsContent value="stock" className="mt-6">
                 <div className="space-y-4">
-                  {/* Stock Tab Debug Info */}
-                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                    <h4 className="font-semibold text-blue-800">Stock Tab Debug:</h4>
-                    <div className="text-sm text-blue-700 mt-2 space-y-1">
-                      <p>Loading: {stocksLoading ? 'Yes' : 'No'}</p>
-                      <p>Error: {stocksError || 'None'}</p>
-                      <p>Stocks Count: {stocks.length}</p>
-                    </div>
-                  </div>
                   
                   {stocksLoading ? (
                     <div className="flex items-center justify-center py-12">
@@ -481,15 +471,6 @@ export default function InventoryPage() {
               
               <TabsContent value="movements" className="mt-6">
                 <div className="space-y-4">
-                  {/* Movements Tab Debug Info */}
-                  <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-                    <h4 className="font-semibold text-green-800">Movements Tab Debug:</h4>
-                    <div className="text-sm text-green-700 mt-2 space-y-1">
-                      <p>Loading: {movementsLoading ? 'Yes' : 'No'}</p>
-                      <p>Error: {movementsError || 'None'}</p>
-                      <p>Movements Count: {movements.length}</p>
-                    </div>
-                  </div>
                   
                   {movementsLoading ? (
                     <div className="flex items-center justify-center py-12">
@@ -514,15 +495,6 @@ export default function InventoryPage() {
               
               <TabsContent value="adjustments" className="mt-6">
                 <div className="space-y-4">
-                  {/* Adjustments Tab Debug Info */}
-                  <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
-                    <h4 className="font-semibold text-purple-800">Adjustments Tab Debug:</h4>
-                    <div className="text-sm text-purple-700 mt-2 space-y-1">
-                      <p>Loading: {adjustmentsLoading ? 'Yes' : 'No'}</p>
-                      <p>Error: {adjustmentsError || 'None'}</p>
-                      <p>Adjustments Count: {adjustments.length}</p>
-                    </div>
-                  </div>
                   
                   {adjustmentsLoading ? (
                     <div className="flex items-center justify-center py-12">
@@ -555,10 +527,60 @@ export default function InventoryPage() {
           isOpen={isAdjustmentModalOpen}
           onClose={handleModalClose}
           item={selectedItem}
-          products={[]}
+          products={stocks.map(stock => ({
+            id: stock.id,
+            name: stock.productName,
+            sku: stock.productSku,
+            price: stock.costPerUnit || 0,
+            stock: stock.currentQuantity,
+            images: [],
+            status: 'published' as const
+          }))}
+        />
+
+        {/* Bulk Stock Levels Management */}
+        <BulkStockLevelsModal
+          isOpen={isBulkModalOpen}
+          onClose={() => setIsBulkModalOpen(false)}
+          onSuccess={fetchStocks}
+        />
+
+        {/* Stock Detail Modal */}
+        <StockDetailModal
+          isOpen={isStockDetailOpen}
+          stock={selectedStockForView}
+          onClose={() => setIsStockDetailOpen(false)}
+          onEdit={handleEditStock}
+        />
+
+        <StockEditModal
+          isOpen={isEditStockModalOpen}
+          stock={selectedStock}
+          onClose={handleEditStockModalClose}
+          onSave={fetchStocks}
         />
 
         {/* Warehouse Management Modal */}
+        {/* Purchase Order Modal */}
+        <PurchaseOrderModal
+          isOpen={isPurchaseOrderModalOpen}
+          onClose={() => setIsPurchaseOrderModalOpen(false)}
+          suppliers={[
+            { id: '1', name: 'Supplier A', email: 'supplier.a@example.com', status: 'active' },
+            { id: '2', name: 'Supplier B', email: 'supplier.b@example.com', status: 'active' },
+            { id: '3', name: 'Supplier C', email: 'supplier.c@example.com', status: 'active' }
+          ]}
+          products={stocks.map(stock => ({
+            id: stock.id,
+            productId: stock.id,
+            productName: stock.productName,
+            productSku: stock.productSku,
+            quantity: 1,
+            unitPrice: stock.costPerUnit || 0,
+            totalPrice: stock.costPerUnit || 0
+          }))}
+        />
+
         <Dialog open={isWarehouseManagementOpen} onOpenChange={setIsWarehouseManagementOpen}>
           <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
