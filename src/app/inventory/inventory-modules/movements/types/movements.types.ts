@@ -81,15 +81,6 @@ export interface CreateMovementRequest {
   expiryDate?: Date;
 }
 
-export interface MovementSummary {
-  totalMovements: number;
-  totalStockIn: number;
-  totalStockOut: number;
-  totalValue: number;
-  movementsToday: number;
-  movementsThisWeek: number;
-  movementsThisMonth: number;
-}
 
 export interface MovementsByProduct {
   productId: string;

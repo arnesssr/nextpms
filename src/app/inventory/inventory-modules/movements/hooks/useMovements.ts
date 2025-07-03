@@ -2,8 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { 
   Movement, 
   CreateMovementRequest, 
-  MovementFilter, 
-  MovementSummary,
+  MovementFilter,
   MovementsByProduct,
   BulkMovementRequest
 } from '../types/movements.types';
@@ -12,7 +11,6 @@ import { movementsService } from '../services/movementsService';
 export interface UseMovementsReturn {
   // Data
   movements: Movement[];
-  summary: MovementSummary | null;
   movementsByProduct: MovementsByProduct[];
   
   // Loading states
@@ -28,7 +26,6 @@ export interface UseMovementsReturn {
   
   // Actions
   loadMovements: () => Promise<void>;
-  loadSummary: () => Promise<void>;
   loadMovementsByProduct: () => Promise<void>;
   createMovement: (request: CreateMovementRequest) => Promise<Movement | null>;
   createBulkMovements: (request: BulkMovementRequest) => Promise<Movement[] | null>;
@@ -43,7 +40,6 @@ const initialFilter: MovementFilter = {};
 export function useMovements(initialFilterOverride?: MovementFilter): UseMovementsReturn {
   // State
   const [movements, setMovements] = useState<Movement[]>([]);
-  const [summary, setSummary] = useState<MovementSummary | null>(null);
   const [movementsByProduct, setMovementsByProduct] = useState<MovementsByProduct[]>([]);
   const [loading, setLoading] = useState(false);
   const [creating, setCreating] = useState(false);
@@ -76,19 +72,6 @@ export function useMovements(initialFilterOverride?: MovementFilter): UseMovemen
     }
   }, [filter]);
 
-  // Load summary
-  const loadSummary = useCallback(async () => {
-    try {
-      setError(null);
-      
-      const data = await movementsService.getMovementSummary(filter);
-      setSummary(data);
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to load summary';
-      setError(errorMessage);
-      console.error('Error loading movement summary:', err);
-    }
-  }, [filter]);
 
   // Load movements by product
   const loadMovementsByProduct = useCallback(async () => {
@@ -115,8 +98,6 @@ export function useMovements(initialFilterOverride?: MovementFilter): UseMovemen
       // Add to the beginning of the list (most recent first)
       setMovements(prev => [newMovement, ...prev]);
       
-      // Reload summary to get updated stats
-      await loadSummary();
       
       return newMovement;
     } catch (err) {
@@ -127,7 +108,7 @@ export function useMovements(initialFilterOverride?: MovementFilter): UseMovemen
     } finally {
       setCreating(false);
     }
-  }, [loadSummary]);
+  }, []);
 
   // Create bulk movements
   const createBulkMovements = useCallback(async (request: BulkMovementRequest): Promise<Movement[] | null> => {
@@ -140,8 +121,6 @@ export function useMovements(initialFilterOverride?: MovementFilter): UseMovemen
       // Add to the beginning of the list (most recent first)
       setMovements(prev => [...newMovements, ...prev]);
       
-      // Reload summary to get updated stats
-      await loadSummary();
       
       return newMovements;
     } catch (err) {
@@ -152,7 +131,7 @@ export function useMovements(initialFilterOverride?: MovementFilter): UseMovemen
     } finally {
       setCreating(false);
     }
-  }, [loadSummary]);
+  }, []);
 
   // Delete movement
   const deleteMovement = useCallback(async (id: string): Promise<boolean> => {
@@ -165,8 +144,6 @@ export function useMovements(initialFilterOverride?: MovementFilter): UseMovemen
       // Remove from local state
       setMovements(prev => prev.filter(movement => movement.id !== id));
       
-      // Reload summary to get updated stats
-      await loadSummary();
       
       return true;
     } catch (err) {
@@ -177,7 +154,7 @@ export function useMovements(initialFilterOverride?: MovementFilter): UseMovemen
     } finally {
       setDeleting(false);
     }
-  }, [loadSummary]);
+  }, []);
 
   // Set filter
   const setFilter = useCallback((newFilter: MovementFilter) => {
@@ -193,10 +170,9 @@ export function useMovements(initialFilterOverride?: MovementFilter): UseMovemen
   const refreshData = useCallback(async () => {
     await Promise.all([
       loadMovements(),
-      loadSummary(),
       loadMovementsByProduct()
     ]);
-  }, [loadMovements, loadSummary, loadMovementsByProduct]);
+  }, [loadMovements, loadMovementsByProduct]);
 
   // Initial load when filter changes
   useEffect(() => {
@@ -206,7 +182,6 @@ export function useMovements(initialFilterOverride?: MovementFilter): UseMovemen
   return {
     // Data
     movements,
-    summary,
     movementsByProduct,
     
     // Loading states
@@ -222,7 +197,6 @@ export function useMovements(initialFilterOverride?: MovementFilter): UseMovemen
     
     // Actions
     loadMovements,
-    loadSummary,
     loadMovementsByProduct,
     createMovement,
     createBulkMovements,

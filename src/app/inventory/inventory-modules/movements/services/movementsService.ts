@@ -1,8 +1,7 @@
 import { 
   Movement, 
   CreateMovementRequest, 
-  MovementFilter, 
-  MovementSummary,
+  MovementFilter,
   MovementsByProduct,
   BulkMovementRequest,
   MovementType,
@@ -98,31 +97,6 @@ class MovementsService {
     }
   }
 
-  async getMovementSummary(filter?: MovementFilter): Promise<MovementSummary> {
-    try {
-      const queryParams = new URLSearchParams();
-      
-      if (filter) {
-        Object.entries(filter).forEach(([key, value]) => {
-          if (value !== undefined && value !== null) {
-            queryParams.append(key, value.toString());
-          }
-        });
-      }
-      
-      const url = `${this.apiUrl}/summary${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
-      const response = await fetch(url);
-      
-      if (!response.ok) {
-        throw new Error(`Failed to fetch movement summary: ${response.statusText}`);
-      }
-      
-      return response.json();
-    } catch (error) {
-      console.error('Error fetching movement summary:', error);
-      throw error;
-    }
-  }
 
   async getMovementsByProduct(filter?: MovementFilter): Promise<MovementsByProduct[]> {
     try {

@@ -13,10 +13,7 @@ import {
   Plus, 
   ArrowUp, 
   ArrowDown, 
-  TrendingUp,
-  TrendingDown,
   RefreshCw,
-  Activity,
   AlertTriangle
 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -24,13 +21,11 @@ import { toast } from 'sonner';
 export default function MovementsPage() {
   const {
     movements,
-    summary,
     loading,
     creating,
     error,
     filter,
     loadMovements,
-    loadSummary,
     createMovement,
     deleteMovement,
     setFilter,
@@ -86,10 +81,6 @@ export default function MovementsPage() {
     toast.success('Data refreshed');
   };
 
-  // Load summary when component mounts
-  React.useEffect(() => {
-    loadSummary();
-  }, [loadSummary]);
 
   return (
     <SidebarLayout>
@@ -129,62 +120,6 @@ export default function MovementsPage() {
           </div>
         </div>
 
-        {/* Summary Cards */}
-        {summary && (
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Total Movements</CardTitle>
-                <Activity className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{summary.totalMovements}</div>
-                <p className="text-xs text-muted-foreground">
-                  {summary.movementsToday} today
-                </p>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Stock In</CardTitle>
-                <TrendingUp className="h-4 w-4 text-green-600" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-green-600">{summary.totalStockIn}</div>
-                <p className="text-xs text-muted-foreground">
-                  Items received
-                </p>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Stock Out</CardTitle>
-                <TrendingDown className="h-4 w-4 text-red-600" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-red-600">{summary.totalStockOut}</div>
-                <p className="text-xs text-muted-foreground">
-                  Items dispatched
-                </p>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Total Value</CardTitle>
-                <Activity className="h-4 w-4 text-blue-600" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">${summary.totalValue.toLocaleString()}</div>
-                <p className="text-xs text-muted-foreground">
-                  Movement value
-                </p>
-              </CardContent>
-            </Card>
-          </div>
-        )}
 
         {/* Error Display */}
         {error && (

@@ -13,12 +13,7 @@ import {
   Filter, 
   RefreshCw, 
   Download,
-  Calendar,
-  X,
-  ArrowUp,
-  ArrowDown,
-  TrendingUp,
-  TrendingDown
+  X
 } from 'lucide-react';
 import { format, subDays, startOfDay, endOfDay } from 'date-fns';
 
@@ -196,82 +191,6 @@ export function MovementsList({
 
   return (
     <div className="space-y-6">
-      {/* Stats Cards */}
-      {showStats && (
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground">Total</p>
-                  <p className="text-2xl font-bold">{stats.total}</p>
-                </div>
-                <TrendingUp className="h-8 w-8 text-blue-600" />
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground">Stock In</p>
-                  <p className="text-2xl font-bold text-green-600">{stats.stockIn}</p>
-                </div>
-                <ArrowUp className="h-8 w-8 text-green-600" />
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground">Stock Out</p>
-                  <p className="text-2xl font-bold text-red-600">{stats.stockOut}</p>
-                </div>
-                <ArrowDown className="h-8 w-8 text-red-600" />
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground">Transfers</p>
-                  <p className="text-2xl font-bold text-blue-600">{stats.transfers}</p>
-                </div>
-                <TrendingDown className="h-8 w-8 text-blue-600" />
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground">Adjustments</p>
-                  <p className="text-2xl font-bold text-amber-600">{stats.adjustments}</p>
-                </div>
-                <Calendar className="h-8 w-8 text-amber-600" />
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground">Total Value</p>
-                  <p className="text-xl font-bold">${stats.totalValue.toLocaleString()}</p>
-                </div>
-                <TrendingUp className="h-8 w-8 text-green-600" />
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      )}
 
       {/* Filters */}
       <Card>
