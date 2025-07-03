@@ -1,12 +1,15 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { CreateMovementRequest, MovementType, MovementReason } from '../types/movements.types';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { ProductPicker, ProductWithStock } from './ProductPicker';
+import { Card, CardContent } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
 import { 
   Package, 
   MapPin, 
@@ -14,7 +17,9 @@ import {
   Calendar,
   FileText,
   Hash,
-  AlertTriangle
+  AlertTriangle,
+  Info,
+  Truck
 } from 'lucide-react';
 
 export interface StockOutModalProps {
@@ -26,26 +31,71 @@ export interface StockOutModalProps {
 }
 
 export function StockOutModal({ isOpen, onClose, onSave, locations, customers }: StockOutModalProps) {
-  const [productName, setProductName] = useState('');
+  const [selectedProduct, setSelectedProduct] = useState<ProductWithStock | null>(null);
   const [quantity, setQuantity] = useState(0);
-  const [unitOfMeasure, setUnitOfMeasure] = useState('pcs');
   const [location, setLocation] = useState(locations.length ? locations[0] : '');
   const [reason, setReason] = useState<MovementReason>(MovementReason.SALE);
   const [customer, setCustomer] = useState(customers.length ? customers[0] : '');
   const [reference, setReference] = useState('');
   const [notes, setNotes] = useState('');
+  const [errors, setErrors] = useState<string[]>([]);
+
+  // Reset form when modal opens/closes
+  useEffect(() => {
+    if (isOpen) {
+      setSelectedProduct(null);
+      setQuantity(0);
+      setLocation(locations.length ? locations[0] : '');
+      setReason(MovementReason.SALE);
+      setCustomer(customers.length ? customers[0] : '');
+      setReference('');
+      setNotes('');
+      setErrors([]);
+    }
+  }, [isOpen, locations, customers]);
+
+  // Get available stock for selected product
+  const availableStock = selectedProduct?.availableStock || 0;
+  const hasInsufficientStock = quantity > availableStock;
+
+  const validateForm = (): string[] => {
+    const validationErrors: string[] = [];
+
+    if (!selectedProduct) {
+      validationErrors.push('Please select a product');
+    }
+
+    if (quantity <= 0) {
+      validationErrors.push('Quantity must be greater than 0');
+    }
+
+    if (selectedProduct && quantity > availableStock) {
+      validationErrors.push(`Insufficient stock. Only ${availableStock} available`);
+    }
+
+    if (!location) {
+      validationErrors.push('Please select a location');
+    }
+
+    return validationErrors;
+  };
 
   const handleSave = () => {
-    if (!productName || quantity <= 0 || !location) return;
+    const validationErrors = validateForm();
+    setErrors(validationErrors);
+
+    if (validationErrors.length > 0 || !selectedProduct) {
+      return;
+    }
 
     const request: CreateMovementRequest = {
-      productId: 'mock-product-id', // In a real app, this would be fetched
+      productId: selectedProduct.id,
       type: MovementType.OUT,
       quantity,
       reason,
       location,
-      reference,
-      notes,
+      reference: reference.trim() || undefined,
+      notes: notes.trim() || undefined,
       customer: reason === MovementReason.SALE ? customer : undefined,
     };
 
@@ -79,65 +129,93 @@ export function StockOutModal({ isOpen, onClose, onSave, locations, customers }:
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-md">
+      <DialogContent className="max-w-lg">
         <DialogHeader>
-          <DialogTitle>Record Stock Out</DialogTitle>
+          <DialogTitle className="flex items-center space-x-2">
+            <Truck className="h-5 w-5 text-red-600" />
+            <span>Record Stock Out</span>
+          </DialogTitle>
         </DialogHeader>
-        
-        <div className="space-y-4">
-          {/* Product Name */}
-          <div className="space-y-1">
-            <label className="text-sm font-medium" htmlFor="productName">Product Name</label>
-            <div className="flex items-center">
-              <Package className="h-4 w-4 text-muted-foreground mr-2" />
-              <Input
-                placeholder="Enter product name..."
-                id="productName"
-                value={productName}
-                onChange={(e) => setProductName(e.target.value)}
-              />
-            </div>
+
+        <div className="space-y-6">
+          {/* Error Messages */}
+          {errors.length > 0 && (
+            <Card className="border-red-200 bg-red-50">
+              <CardContent className="p-4">
+                <div className="flex items-start space-x-2">
+                  <AlertTriangle className="h-4 w-4 text-red-600 mt-0.5" />
+                  <div>
+                    <h4 className="text-sm font-medium text-red-800">Please fix the following errors:</h4>
+                    <ul className="list-disc list-inside text-sm text-red-700 mt-1">
+                      {errors.map((error, index) => (
+                        <li key={index}>{error}</li>
+                      ))}
+                    </ul>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Product Selection */}
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Select Product</label>
+            <ProductPicker
+              value={selectedProduct}
+              onSelect={setSelectedProduct}
+              placeholder="Search and select a product..."
+              showStockInfo={true}
+              filterOutOfStock={true}
+              className="w-full"
+            />
           </div>
 
-          {/* Quantity */}
+          {/* Product Details */}
+          {selectedProduct && (
+            <Card className="bg-red-50 border-red-200">
+              <CardContent className="p-4">
+                <div className="flex items-start justify-between">
+                  <div className="space-y-1">
+                    <h4 className="font-medium text-red-900">{selectedProduct.name}</h4>
+                    <p className="text-sm text-red-700">SKU: {selectedProduct.sku || 'N/A'}</p>
+                    <div className="flex items-center space-x-4 text-sm">
+                      <span className="text-red-600">Current Stock: {selectedProduct.availableStock || 0}</span>
+                      <span className="text-red-600">Price: ${selectedProduct.selling_price}</span>
+                    </div>
+                  </div>
+                  <Info className="h-4 w-4 text-red-600" />
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Movement Details */}
           <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-1">
-              <label className="text-sm font-medium" htmlFor="quantity">Quantity</label>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Quantity</label>
               <div className="flex items-center">
                 <Hash className="h-4 w-4 text-muted-foreground mr-2" />
                 <Input
-                  placeholder="Enter quantity..."
-                  id="quantity"
+                  placeholder="Enter quantity"
                   type="number"
-                  value={quantity}
+                  min="1"
+                  value={quantity || ''}
                   onChange={(e) => setQuantity(parseInt(e.target.value) || 0)}
                 />
               </div>
+              {hasInsufficientStock && (
+                <p className="text-xs text-red-600">
+                  Insufficient stock. Only {availableStock} available.
+                </p>
+              )}
             </div>
 
-            <div className="space-y-1">
-              <label className="text-sm font-medium" htmlFor="unitOfMeasure">Unit of Measure</label>
-              <Select value={unitOfMeasure} onValueChange={setUnitOfMeasure}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="pcs">pcs</SelectItem>
-                  <SelectItem value="kg">kg</SelectItem>
-                  <SelectItem value="boxes">boxes</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-
-          {/* Reason */}
-          <div className="space-y-1">
-            <label className="text-sm font-medium" htmlFor="reason">Reason</label>
-            <div className="flex items-center">
-              {getReasonIcon(reason)}
-              <div className="ml-2 flex-1">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Reason</label>
+              <div className="flex items-center">
+                {getReasonIcon(reason)}
                 <Select value={reason} onValueChange={(value) => setReason(value as MovementReason)}>
-                  <SelectTrigger>
+                  <SelectTrigger className="ml-2">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -153,8 +231,8 @@ export function StockOutModal({ isOpen, onClose, onSave, locations, customers }:
           </div>
 
           {/* Location */}
-          <div className="space-y-1">
-            <label className="text-sm font-medium" htmlFor="location">Location</label>
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Location</label>
             <div className="flex items-center">
               <MapPin className="h-4 w-4 text-muted-foreground mr-2" />
               <Select value={location} onValueChange={setLocation}>
@@ -172,8 +250,8 @@ export function StockOutModal({ isOpen, onClose, onSave, locations, customers }:
 
           {/* Customer (only for sales) */}
           {reason === MovementReason.SALE && (
-            <div className="space-y-1">
-              <label className="text-sm font-medium" htmlFor="customer">Customer</label>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Customer</label>
               <div className="flex items-center">
                 <Users className="h-4 w-4 text-muted-foreground mr-2" />
                 <Select value={customer} onValueChange={setCustomer}>
@@ -190,28 +268,24 @@ export function StockOutModal({ isOpen, onClose, onSave, locations, customers }:
             </div>
           )}
 
-          {/* Reference */}
-          <div className="space-y-1">
-            <label className="text-sm font-medium" htmlFor="reference">Reference #</label>
-            <div className="flex items-center">
-              <FileText className="h-4 w-4 text-muted-foreground mr-2" />
-              <Input
-                placeholder="Enter reference..."
-                id="reference"
-                value={reference}
-                onChange={(e) => setReference(e.target.value)}
-              />
+          {/* Reference and Notes */}
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Reference # (Optional)</label>
+              <div className="flex items-center">
+                <FileText className="h-4 w-4 text-muted-foreground mr-2" />
+                <Input
+                  placeholder="Invoice, return order, etc."
+                  value={reference}
+                  onChange={(e) => setReference(e.target.value)}
+                />
+              </div>
             </div>
-          </div>
 
-          {/* Notes */}
-          <div className="space-y-1">
-            <label className="text-sm font-medium" htmlFor="notes">Notes</label>
-            <div className="flex items-start">
-              <Calendar className="h-4 w-4 text-muted-foreground mr-2 mt-0.5" />
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Notes (Optional)</label>
               <Textarea
-                placeholder="Enter any notes..."
-                id="notes"
+                placeholder="Additional notes about this stock movement..."
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
                 rows={3}
@@ -221,21 +295,29 @@ export function StockOutModal({ isOpen, onClose, onSave, locations, customers }:
 
           {/* Warning for problematic reasons */}
           {[MovementReason.DAMAGED, MovementReason.EXPIRED, MovementReason.LOST].includes(reason) && (
-            <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
-              <div className="flex items-center">
-                <AlertTriangle className="h-4 w-4 text-amber-600 mr-2" />
-                <span className="text-sm text-amber-700">
-                  This will reduce stock due to {reason.replace('_', ' ').toLowerCase()}. 
-                  Please ensure this is documented properly.
-                </span>
-              </div>
-            </div>
+            <Card className="border-amber-200 bg-amber-50">
+              <CardContent className="p-3">
+                <div className="flex items-center">
+                  <AlertTriangle className="h-4 w-4 text-amber-600 mr-2" />
+                  <span className="text-sm text-amber-700">
+                    This will reduce stock due to {reason.replace('_', ' ').toLowerCase()}. 
+                    Please ensure this is documented properly.
+                  </span>
+                </div>
+              </CardContent>
+            </Card>
           )}
 
           {/* Action Buttons */}
-          <div className="flex space-x-2 justify-end">
+          <div className="flex space-x-2 justify-end pt-4 border-t">
             <Button variant="outline" onClick={onClose}>Cancel</Button>
-            <Button onClick={handleSave}>Save</Button>
+            <Button
+              onClick={handleSave}
+              disabled={!selectedProduct || quantity <= 0 || hasInsufficientStock}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              Record Stock Out
+            </Button>
           </div>
         </div>
       </DialogContent>
