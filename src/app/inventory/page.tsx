@@ -10,6 +10,12 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 import { 
   Plus, 
   Search, 
@@ -64,6 +70,8 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import BulkStockLevelsModal from './inventory-modules/stock/components/BulkStockLevelsModal';
+import { BulkReorderPointsModal } from '@/components/modals/BulkReorderPointsModal';
+import { AutoReorderConfirmationModal } from '@/components/modals/AutoReorderConfirmationModal';
 import StockDetailModal from './inventory-modules/stock/components/StockDetailModal';
 import StockEditModal from './inventory-modules/stock/components/StockEditModal';
 import PurchaseOrderModal from './inventory-modules/purchase-orders/components/PurchaseOrderModal';
@@ -81,6 +89,7 @@ export default function InventoryPage() {
   const [selectedWarehouse, setSelectedWarehouse] = useState<Warehouse | null>(null);
   const [isWarehouseManagementOpen, setIsWarehouseManagementOpen] = useState(false);
   const [isBulkModalOpen, setIsBulkModalOpen] = useState(false);
+  const [isBulkReorderPointsModalOpen, setIsBulkReorderPointsModalOpen] = useState(false);
   const [isStockDetailOpen, setIsStockDetailOpen] = useState(false);
   const [selectedStockForView, setSelectedStockForView] = useState(null);
   const [isPurchaseOrderModalOpen, setIsPurchaseOrderModalOpen] = useState(false);
@@ -115,29 +124,6 @@ export default function InventoryPage() {
     });
   }, [stocks, stocksLoading, stocksError]);
 
-  // Add temporary direct product fetch for display
-  const [tempProducts, setTempProducts] = useState([]);
-  const [tempLoading, setTempLoading] = useState(false);
-
-  const fetchProductsDirectly = async () => {
-    setTempLoading(true);
-    try {
-      const response = await fetch('/api/products');
-      const data = await response.json();
-      console.log('Direct products fetch:', data);
-      if (data.data) {
-        setTempProducts(data.data);
-      }
-    } catch (error) {
-      console.error('Error fetching products directly:', error);
-    } finally {
-      setTempLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchProductsDirectly();
-  }, []);
 
   // Convert stocks data to match the InventoryTable format from API response
   const enhancedInventory = stocks.map(stock => {
@@ -156,7 +142,7 @@ export default function InventoryPage() {
         id: stock.product_id || stock.productId || stock.id,
         name: productData.name || stock.productName || 'Unknown Product',
         sku: productData.sku || stock.productSku || 'N/A',
-        price: productData.selling_price || stock.unitPrice || 0,
+        price: productData.selling_price || productData.cost_price || stock.unit_cost || stock.unitPrice || stock.costPerUnit || 0,
         status: 'published' as const
       }
     };
@@ -257,6 +243,97 @@ export default function InventoryPage() {
   // Get unique locations for filter
   const locations = [...new Set(enhancedInventory.map(item => item.location))];
 
+  // Action handlers for overview buttons
+  const [isLoading, setIsLoading] = useState(false);
+
+  const handleSyncStock = async () => {
+    setIsLoading(true);
+    try {
+      console.log('Syncing stock data...');
+      await fetchStocks();
+      // Also sync with API utility endpoint
+      const response = await fetch('/api/inventory/utilities/sync-costs', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+      });
+      const result = await response.json();
+      console.log('Sync result:', result);
+      alert('Stock data synced successfully!');
+    } catch (error) {
+      console.error('Error syncing stock:', error);
+      alert('Failed to sync stock data. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleExportInventory = () => {
+    try {
+      const csvData = [
+        ['Product Name', 'SKU', 'Current Stock', 'Reserved', 'Location', 'Value', 'Status'],
+        ...filteredInventory.map(item => [
+          item.product?.name || 'N/A',
+          item.product?.sku || 'N/A',
+          item.quantity.toString(),
+          item.reservedQuantity.toString(),
+          item.location,
+          `$${(item.quantity * (item.product?.price || 0)).toFixed(2)}`,
+          item.quantity === 0 ? 'Out of Stock' : 
+            item.quantity <= item.lowStockThreshold ? 'Low Stock' : 'In Stock'
+        ])
+      ];
+      
+      const csvContent = csvData.map(row => row.map(field => `"${field}"`).join(',')).join('\n');
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement('a');
+      const url = URL.createObjectURL(blob);
+      link.setAttribute('href', url);
+      link.setAttribute('download', `inventory-export-${new Date().toISOString().split('T')[0]}.csv`);
+      link.style.visibility = 'hidden';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      console.log('Inventory exported successfully');
+    } catch (error) {
+      console.error('Error exporting inventory:', error);
+      alert('Failed to export inventory. Please try again.');
+    }
+  };
+
+  const handleAutoReorder = async () => {
+    try {
+      console.log('Triggering auto reorder for low stock items...');
+      const lowStockItems = enhancedInventory.filter(item => 
+        item.quantity <= item.lowStockThreshold && item.quantity > 0
+      );
+      
+      if (lowStockItems.length === 0) {
+        alert('No low stock items found that require reordering.');
+        return;
+      }
+      
+      const message = `Found ${lowStockItems.length} items with low stock:\n\n` +
+        lowStockItems.slice(0, 5).map(item => 
+          `• ${item.product?.name} (${item.product?.sku}): ${item.quantity} remaining`
+        ).join('\n') +
+        (lowStockItems.length > 5 ? `\n...and ${lowStockItems.length - 5} more` : '') +
+        '\n\nWould you like to generate purchase orders for these items?';
+      
+      if (confirm(message)) {
+        setIsPurchaseOrderModalOpen(true);
+      }
+    } catch (error) {
+      console.error('Error in auto reorder:', error);
+      alert('Failed to process auto reorder. Please try again.');
+    }
+  };
+
+  const handleBulkReorderPoints = () => {
+    // Open the dedicated bulk reorder points modal
+    setIsBulkReorderPointsModalOpen(true);
+  };
+
   return (
     <SidebarLayout>
       <div className="space-y-6">
@@ -265,39 +342,129 @@ export default function InventoryPage() {
           <div>
             <h2 className="text-3xl font-bold tracking-tight">Inventory</h2>
           </div>
-          <div className="flex space-x-2">
-            <Button variant="outline" title="Sync Stock">
-              <RefreshCw className="h-4 w-4" />
-            </Button>
-            <Button variant="outline" title="Export">
-              <Download className="h-4 w-4" />
-            </Button>
-            <Button variant="outline" onClick={() => {
-              setIsWarehouseManagementOpen(true);
-            }} title="Warehouses">
-              <Building2 className="h-4 w-4" />
-            </Button>
-            <Button variant="outline" onClick={() => {
-              // TODO: Implement auto reorder functionality
-              console.log('Auto reorder triggered');
-            }} title="Auto Reorder">
-              <RotateCcw className="h-4 w-4" />
-            </Button>
-            <Button variant="outline" onClick={() => {
-              console.log('Open Bulk Stock Levels Management');
-              setIsBulkModalOpen(true);
-            }} title="Manage Stock Levels">
-              <Settings className="h-4 w-4" />
-            </Button>
-            <Button variant="outline" onClick={() => {
-              setIsPurchaseOrderModalOpen(true);
-            }} title="Generate Purchase Order">
-              <ShoppingCart className="h-4 w-4" />
-            </Button>
-            <Button onClick={() => setIsAdjustmentModalOpen(true)} title="Adjust Stock">
-              <Plus className="h-4 w-4" />
-            </Button>
-          </div>
+          <TooltipProvider>
+            <div className="flex space-x-2">
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button 
+                    variant="outline" 
+                    size="icon"
+                    onClick={handleSyncStock}
+                    disabled={isLoading}
+                  >
+                    <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>{isLoading ? 'Syncing stock data...' : 'Sync Stock Data'}</p>
+                </TooltipContent>
+              </Tooltip>
+              
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button 
+                    variant="outline" 
+                    size="icon"
+                    onClick={handleExportInventory}
+                  >
+                    <Download className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Export Inventory Data</p>
+                </TooltipContent>
+              </Tooltip>
+              
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button 
+                    variant="outline" 
+                    size="icon"
+                    onClick={() => setIsWarehouseManagementOpen(true)}
+                  >
+                    <Building2 className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Manage Warehouses</p>
+                </TooltipContent>
+              </Tooltip>
+              
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button 
+                    variant="outline" 
+                    size="icon"
+                    onClick={handleAutoReorder}
+                  >
+                    <RotateCcw className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Auto Reorder Low Stock Items</p>
+                </TooltipContent>
+              </Tooltip>
+              
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button 
+                    variant="outline" 
+                    size="icon"
+                    onClick={() => setIsBulkModalOpen(true)}
+                  >
+                    <Settings className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Bulk Stock Level Management</p>
+                </TooltipContent>
+              </Tooltip>
+              
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button 
+                    variant="outline" 
+                    size="icon"
+                    onClick={handleBulkReorderPoints}
+                  >
+                    <Package className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Bulk Set Reorder Points</p>
+                </TooltipContent>
+              </Tooltip>
+              
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button 
+                    variant="outline" 
+                    size="icon"
+                    onClick={() => setIsPurchaseOrderModalOpen(true)}
+                  >
+                    <ShoppingCart className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Generate Purchase Order</p>
+                </TooltipContent>
+              </Tooltip>
+              
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button 
+                    size="icon"
+                    onClick={() => setIsAdjustmentModalOpen(true)}
+                  >
+                    <Plus className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Create Stock Adjustment</p>
+                </TooltipContent>
+              </Tooltip>
+            </div>
+          </TooltipProvider>
         </div>
 
         {/* Inventory Modules Navigation */}
@@ -372,60 +539,9 @@ export default function InventoryPage() {
                     </div>
                   </div>
                   
-                  {/* Temporary Products Display */}
-                  {tempProducts.length > 0 && (
-                    <div className="mb-6">
-                      <h4 className="text-md font-semibold mb-3 text-green-700">📦 Temporary Products Display (Real Data):</h4>
-                      <div className="bg-white rounded-lg shadow border overflow-hidden">
-                        <div className="overflow-x-auto">
-                          <table className="min-w-full divide-y divide-gray-200">
-                            <thead className="bg-gray-50">
-                              <tr>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Product</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">SKU</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Stock</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Price</th>
-                              </tr>
-                            </thead>
-                            <tbody className="bg-white divide-y divide-gray-200">
-                              {tempProducts.map((product: any) => (
-                                <tr key={product.id} className="hover:bg-gray-50">
-                                  <td className="px-6 py-4 whitespace-nowrap">
-                                    <div className="text-sm font-medium text-gray-900">{product.name}</div>
-                                  </td>
-                                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                    {product.sku || 'N/A'}
-                                  </td>
-                                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                    {product.stock_quantity || 0}
-                                  </td>
-                                  <td className="px-6 py-4 whitespace-nowrap">
-                                    <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                                      (product.stock_quantity || 0) > 10
-                                        ? 'bg-green-100 text-green-800'
-                                        : (product.stock_quantity || 0) > 0
-                                        ? 'bg-yellow-100 text-yellow-800'
-                                        : 'bg-red-100 text-red-800'
-                                    }`}>
-                                      {(product.stock_quantity || 0) > 10 ? 'In Stock' : (product.stock_quantity || 0) > 0 ? 'Low Stock' : 'Out of Stock'}
-                                    </span>
-                                  </td>
-                                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                    ${product.selling_price || '0.00'}
-                                  </td>
-                                </tr>
-                              ))}
-                            </tbody>
-                          </table>
-                        </div>
-                      </div>
-                    </div>
-                  )}
                   
-                  {/* Original Inventory Table */}
+                  {/* Inventory Table */}
                   <div className="mb-6">
-                    <h4 className="text-md font-semibold mb-3 text-blue-700">📋 Inventory API Data:</h4>
                     <InventoryTable 
                       inventory={filteredInventory}
                       onStockAdjustment={handleStockAdjustment}
@@ -542,6 +658,13 @@ export default function InventoryPage() {
         <BulkStockLevelsModal
           isOpen={isBulkModalOpen}
           onClose={() => setIsBulkModalOpen(false)}
+          onSuccess={fetchStocks}
+        />
+
+        {/* Bulk Reorder Points Management */}
+        <BulkReorderPointsModal
+          isOpen={isBulkReorderPointsModalOpen}
+          onClose={() => setIsBulkReorderPointsModalOpen(false)}
           onSuccess={fetchStocks}
         />
 

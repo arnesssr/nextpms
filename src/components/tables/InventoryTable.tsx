@@ -1,6 +1,9 @@
 'use client';
 
 import { useState } from 'react';
+import { ReorderPointModal } from '@/components/modals/ReorderPointModal';
+import { HistoryModal } from '@/components/modals/HistoryModal';
+import { ChangeLocationModal } from '@/components/modals/ChangeLocationModal';
 import {
   Table,
   TableBody,
@@ -47,6 +50,12 @@ interface InventoryTableProps {
 
 export function InventoryTable({ inventory, onStockAdjustment }: InventoryTableProps) {
   const [selectedItems, setSelectedItems] = useState<string[]>([]);
+  const [isReorderModalOpen, setIsReorderModalOpen] = useState(false);
+  const [selectedItemForReorder, setSelectedItemForReorder] = useState<EnhancedInventoryItem | null>(null);
+  const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
+  const [selectedItemForHistory, setSelectedItemForHistory] = useState<EnhancedInventoryItem | null>(null);
+  const [isChangeLocationModalOpen, setIsChangeLocationModalOpen] = useState(false);
+  const [selectedItemForLocation, setSelectedItemForLocation] = useState<EnhancedInventoryItem | null>(null);
 
   const getStockStatus = (item: EnhancedInventoryItem) => {
     if (item.quantity === 0) {
@@ -117,8 +126,46 @@ export function InventoryTable({ inventory, onStockAdjustment }: InventoryTableP
   };
 
   const handleReorderPoint = (item: EnhancedInventoryItem) => {
-    // TODO: Implement reorder point calculation
-    console.log('Setting reorder point for:', item.id);
+    setSelectedItemForReorder(item);
+    setIsReorderModalOpen(true);
+  };
+
+  const handleSaveReorderPoint = async (itemId: string, reorderPoint: number, reorderQuantity: number) => {
+    try {
+      // Call API to update reorder point
+      const response = await fetch(`/api/inventory/${itemId}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          min_stock_level: reorderPoint,
+          reorder_quantity: reorderQuantity,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to update reorder point');
+      }
+
+      console.log('Reorder point updated successfully');
+      // You might want to refresh the inventory data here
+      // or call a callback to update the parent component
+      
+    } catch (error) {
+      console.error('Error updating reorder point:', error);
+      throw error; // Re-throw to let the modal handle the error
+    }
+  };
+
+  const handleViewHistory = (item: EnhancedInventoryItem) => {
+    setSelectedItemForHistory(item);
+    setIsHistoryModalOpen(true);
+  };
+
+  const handleChangeLocation = (item: EnhancedInventoryItem) => {
+    setSelectedItemForLocation(item);
+    setIsChangeLocationModalOpen(true);
   };
 
   return (
@@ -182,7 +229,7 @@ export function InventoryTable({ inventory, onStockAdjustment }: InventoryTableP
               inventory.map((item) => {
                 const stockStatus = getStockStatus(item);
                 const stockProgress = getStockProgress(item);
-                const itemValue = item.quantity * (item.product?.price || 0);
+                const itemValue = item.quantity * (item.product?.price || item.product?.selling_price || item.product?.cost_price || 0);
                 
                 return (
                   <TableRow key={item.id}>
@@ -304,11 +351,11 @@ export function InventoryTable({ inventory, onStockAdjustment }: InventoryTableP
                               Set Reorder Point
                             </DropdownMenuItem>
                             <DropdownMenuSeparator />
-                            <DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleViewHistory(item)}>
                               <TrendingUp className="mr-2 h-4 w-4" />
                               View History
                             </DropdownMenuItem>
-                            <DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleChangeLocation(item)}>
                               <MapPin className="mr-2 h-4 w-4" />
                               Change Location
                             </DropdownMenuItem>
@@ -331,6 +378,41 @@ export function InventoryTable({ inventory, onStockAdjustment }: InventoryTableP
           {/* Add pagination controls here when needed */}
         </div>
       )}
+
+      {/* Reorder Point Modal */}
+      <ReorderPointModal
+        isOpen={isReorderModalOpen}
+        onClose={() => {
+          setIsReorderModalOpen(false);
+          setSelectedItemForReorder(null);
+        }}
+        item={selectedItemForReorder}
+        onSave={handleSaveReorderPoint}
+      />
+
+      {/* History Modal */}
+      <HistoryModal
+        isOpen={isHistoryModalOpen}
+        onClose={() => {
+          setIsHistoryModalOpen(false);
+          setSelectedItemForHistory(null);
+        }}
+        item={selectedItemForHistory}
+      />
+
+      {/* Change Location Modal */}
+      <ChangeLocationModal
+        isOpen={isChangeLocationModalOpen}
+        onClose={() => {
+          setIsChangeLocationModalOpen(false);
+          setSelectedItemForLocation(null);
+        }}
+        item={selectedItemForLocation}
+        onSuccess={() => {
+          // You might want to refresh inventory data here
+          console.log('Location changed successfully');
+        }}
+      />
     </div>
   );
 }
