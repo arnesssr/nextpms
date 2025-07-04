@@ -1,425 +1,182 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Button } from '@/components/ui/button';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Textarea } from '@/components/ui/textarea';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Separator } from '@/components/ui/separator';
+import { Button } from '@/components/ui/button';
+import { SupplierFormData } from '../types/suppliers.types';
 import { useSuppliers } from '../hooks/useSuppliers';
-import { CreateSupplierRequest } from '../types/supplier.types';
 
 interface CreateSupplierModalProps {
-  isOpen: boolean;
+  open: boolean;
   onClose: () => void;
 }
 
-export const CreateSupplierModal: React.FC<CreateSupplierModalProps> = ({
-  isOpen,
-  onClose,
-}) => {
-  const { createSupplier, loading } = useSuppliers();
-  const [formData, setFormData] = useState<CreateSupplierRequest>({
+export const CreateSupplierModal: React.FC<CreateSupplierModalProps> = ({ open, onClose }) => {
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [form, setForm] = useState<SupplierFormData>({
     name: '',
-    code: '',
+    companyName: '',
     email: '',
     phone: '',
-    contactPerson: '',
+    address: {
+      street: '',
+      city: '',
+      state: '',
+      zipCode: '',
+      country: ''
+    },
+    contactPerson: {
+      name: '',
+      title: '',
+      email: '',
+      phone: ''
+    },
     businessType: 'manufacturer',
     supplierType: 'primary',
-    status: 'active',
-    address: '',
-    city: '',
-    state: '',
-    postalCode: '',
-    country: '',
+    paymentTerms: '',
     taxId: '',
-    paymentTerms: 'net_30',
-    creditLimit: 0,
-    notes: '',
+    website: '',
+    notes: ''
   });
+  const { createSupplier } = useSuppliers();
 
-  const [errors, setErrors] = useState<Partial<CreateSupplierRequest>>({});
-
-  const handleInputChange = (field: keyof CreateSupplierRequest, value: any) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
-    // Clear error when user starts typing
-    if (errors[field]) {
-      setErrors(prev => ({ ...prev, [field]: undefined }));
-    }
+  const handleChange = (field: keyof SupplierFormData, value: any) => {
+    setForm(prev => ({ ...prev, [field]: value }));
   };
 
-  const validateForm = (): boolean => {
-    const newErrors: Partial<CreateSupplierRequest> = {};
-
-    if (!formData.name?.trim()) {
-      newErrors.name = 'Supplier name is required';
-    }
-
-    if (!formData.code?.trim()) {
-      newErrors.code = 'Supplier code is required';
-    }
-
-    if (!formData.email?.trim()) {
-      newErrors.email = 'Email is required';
-    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
-      newErrors.email = 'Please enter a valid email address';
-    }
-
-    if (!formData.phone?.trim()) {
-      newErrors.phone = 'Phone number is required';
-    }
-
-    if (!formData.contactPerson?.trim()) {
-      newErrors.contactPerson = 'Contact person is required';
-    }
-
-    if (formData.creditLimit < 0) {
-      newErrors.creditLimit = 'Credit limit cannot be negative';
-    }
-
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (!validateForm()) {
+  const handleSubmit = async () => {
+    // Basic validation
+    if (!form.name.trim() || !form.companyName.trim() || !form.email.trim() || !form.phone.trim()) {
+      alert('Please fill in all required fields');
       return;
     }
 
+    setIsSubmitting(true);
     try {
-      await createSupplier(formData);
-      onClose();
+      await createSupplier(form);
+      // Success feedback
+      console.log('Supplier created successfully');
+      
       // Reset form
-      setFormData({
+      setForm({
         name: '',
-        code: '',
+        companyName: '',
         email: '',
         phone: '',
-        contactPerson: '',
+        address: {
+          street: '',
+          city: '',
+          state: '',
+          zipCode: '',
+          country: ''
+        },
+        contactPerson: {
+          name: '',
+          title: '',
+          email: '',
+          phone: ''
+        },
         businessType: 'manufacturer',
         supplierType: 'primary',
-        status: 'active',
-        address: '',
-        city: '',
-        state: '',
-        postalCode: '',
-        country: '',
+        paymentTerms: '',
         taxId: '',
-        paymentTerms: 'net_30',
-        creditLimit: 0,
-        notes: '',
+        website: '',
+        notes: ''
       });
-      setErrors({});
+      
+      onClose();
     } catch (error) {
       console.error('Error creating supplier:', error);
+      if (error instanceof Error) {
+        alert(`Error: ${error.message}`);
+      } else {
+        alert('Failed to create supplier');
+      }
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
-  const handleClose = () => {
-    onClose();
-    setErrors({});
-  };
-
   return (
-    <Dialog open={isOpen} onOpenChange={handleClose}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+    <Dialog open={open} onOpenChange={onClose}>
+      <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
-          <DialogTitle>Add New Supplier</DialogTitle>
+          <DialogTitle>Create Supplier</DialogTitle>
+          <DialogDescription>
+            Add a new supplier to your database. Fill in the required information below.
+          </DialogDescription>
         </DialogHeader>
-
-        <form onSubmit={handleSubmit} className="space-y-6">
-          {/* Basic Information */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">Basic Information</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="name">Supplier Name *</Label>
-                  <Input
-                    id="name"
-                    value={formData.name}
-                    onChange={(e) => handleInputChange('name', e.target.value)}
-                    placeholder="Enter supplier name"
-                    className={errors.name ? 'border-red-500' : ''}
-                  />
-                  {errors.name && (
-                    <p className="text-sm text-red-500 mt-1">{errors.name}</p>
-                  )}
-                </div>
-
-                <div>
-                  <Label htmlFor="code">Supplier Code *</Label>
-                  <Input
-                    id="code"
-                    value={formData.code}
-                    onChange={(e) => handleInputChange('code', e.target.value)}
-                    placeholder="Enter supplier code"
-                    className={errors.code ? 'border-red-500' : ''}
-                  />
-                  {errors.code && (
-                    <p className="text-sm text-red-500 mt-1">{errors.code}</p>
-                  )}
-                </div>
-
-                <div>
-                  <Label htmlFor="businessType">Business Type</Label>
-                  <Select
-                    value={formData.businessType}
-                    onValueChange={(value) => handleInputChange('businessType', value)}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select business type" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="manufacturer">Manufacturer</SelectItem>
-                      <SelectItem value="distributor">Distributor</SelectItem>
-                      <SelectItem value="retailer">Retailer</SelectItem>
-                      <SelectItem value="service_provider">Service Provider</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div>
-                  <Label htmlFor="supplierType">Supplier Type</Label>
-                  <Select
-                    value={formData.supplierType}
-                    onValueChange={(value) => handleInputChange('supplierType', value)}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select supplier type" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="primary">Primary</SelectItem>
-                      <SelectItem value="secondary">Secondary</SelectItem>
-                      <SelectItem value="backup">Backup</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div>
-                  <Label htmlFor="status">Status</Label>
-                  <Select
-                    value={formData.status}
-                    onValueChange={(value) => handleInputChange('status', value)}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select status" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="active">Active</SelectItem>
-                      <SelectItem value="inactive">Inactive</SelectItem>
-                      <SelectItem value="pending">Pending</SelectItem>
-                      <SelectItem value="suspended">Suspended</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Contact Information */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">Contact Information</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="contactPerson">Contact Person *</Label>
-                  <Input
-                    id="contactPerson"
-                    value={formData.contactPerson}
-                    onChange={(e) => handleInputChange('contactPerson', e.target.value)}
-                    placeholder="Enter contact person name"
-                    className={errors.contactPerson ? 'border-red-500' : ''}
-                  />
-                  {errors.contactPerson && (
-                    <p className="text-sm text-red-500 mt-1">{errors.contactPerson}</p>
-                  )}
-                </div>
-
-                <div>
-                  <Label htmlFor="email">Email *</Label>
-                  <Input
-                    id="email"
-                    type="email"
-                    value={formData.email}
-                    onChange={(e) => handleInputChange('email', e.target.value)}
-                    placeholder="Enter email address"
-                    className={errors.email ? 'border-red-500' : ''}
-                  />
-                  {errors.email && (
-                    <p className="text-sm text-red-500 mt-1">{errors.email}</p>
-                  )}
-                </div>
-
-                <div>
-                  <Label htmlFor="phone">Phone *</Label>
-                  <Input
-                    id="phone"
-                    value={formData.phone}
-                    onChange={(e) => handleInputChange('phone', e.target.value)}
-                    placeholder="Enter phone number"
-                    className={errors.phone ? 'border-red-500' : ''}
-                  />
-                  {errors.phone && (
-                    <p className="text-sm text-red-500 mt-1">{errors.phone}</p>
-                  )}
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Address Information */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">Address Information</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div>
-                <Label htmlFor="address">Address</Label>
-                <Textarea
-                  id="address"
-                  value={formData.address}
-                  onChange={(e) => handleInputChange('address', e.target.value)}
-                  placeholder="Enter address"
-                  rows={3}
-                />
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                <div>
-                  <Label htmlFor="city">City</Label>
-                  <Input
-                    id="city"
-                    value={formData.city}
-                    onChange={(e) => handleInputChange('city', e.target.value)}
-                    placeholder="Enter city"
-                  />
-                </div>
-
-                <div>
-                  <Label htmlFor="state">State</Label>
-                  <Input
-                    id="state"
-                    value={formData.state}
-                    onChange={(e) => handleInputChange('state', e.target.value)}
-                    placeholder="Enter state"
-                  />
-                </div>
-
-                <div>
-                  <Label htmlFor="postalCode">Postal Code</Label>
-                  <Input
-                    id="postalCode"
-                    value={formData.postalCode}
-                    onChange={(e) => handleInputChange('postalCode', e.target.value)}
-                    placeholder="Enter postal code"
-                  />
-                </div>
-
-                <div>
-                  <Label htmlFor="country">Country</Label>
-                  <Input
-                    id="country"
-                    value={formData.country}
-                    onChange={(e) => handleInputChange('country', e.target.value)}
-                    placeholder="Enter country"
-                  />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Business Information */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">Business Information</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="taxId">Tax ID</Label>
-                  <Input
-                    id="taxId"
-                    value={formData.taxId}
-                    onChange={(e) => handleInputChange('taxId', e.target.value)}
-                    placeholder="Enter tax ID"
-                  />
-                </div>
-
-                <div>
-                  <Label htmlFor="paymentTerms">Payment Terms</Label>
-                  <Select
-                    value={formData.paymentTerms}
-                    onValueChange={(value) => handleInputChange('paymentTerms', value)}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select payment terms" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="net_15">Net 15</SelectItem>
-                      <SelectItem value="net_30">Net 30</SelectItem>
-                      <SelectItem value="net_60">Net 60</SelectItem>
-                      <SelectItem value="net_90">Net 90</SelectItem>
-                      <SelectItem value="cod">Cash on Delivery</SelectItem>
-                      <SelectItem value="prepaid">Prepaid</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div>
-                  <Label htmlFor="creditLimit">Credit Limit</Label>
-                  <Input
-                    id="creditLimit"
-                    type="number"
-                    value={formData.creditLimit}
-                    onChange={(e) => handleInputChange('creditLimit', Number(e.target.value))}
-                    placeholder="Enter credit limit"
-                    min="0"
-                    step="0.01"
-                    className={errors.creditLimit ? 'border-red-500' : ''}
-                  />
-                  {errors.creditLimit && (
-                    <p className="text-sm text-red-500 mt-1">{errors.creditLimit}</p>
-                  )}
-                </div>
-              </div>
-
-              <div>
-                <Label htmlFor="notes">Notes</Label>
-                <Textarea
-                  id="notes"
-                  value={formData.notes}
-                  onChange={(e) => handleInputChange('notes', e.target.value)}
-                  placeholder="Enter any additional notes"
-                  rows={3}
-                />
-              </div>
-            </CardContent>
-          </Card>
-
-          <DialogFooter>
-            <Button type="button" variant="outline" onClick={handleClose}>
-              Cancel
-            </Button>
-            <Button type="submit" disabled={loading}>
-              {loading ? 'Creating...' : 'Create Supplier'}
-            </Button>
-          </DialogFooter>
-        </form>
+        
+        <div className="grid gap-4 py-4">
+          <div className="grid grid-cols-4 items-center gap-4">
+            <Label htmlFor="name" className="text-right">
+              Name
+            </Label>
+            <Input
+              id="name"
+              value={form.name}
+              onChange={(e) => handleChange('name', e.target.value)}
+              className="col-span-3"
+            />
+          </div>
+          
+          <div className="grid grid-cols-4 items-center gap-4">
+            <Label htmlFor="companyName" className="text-right">
+              Company
+            </Label>
+            <Input
+              id="companyName"
+              value={form.companyName}
+              onChange={(e) => handleChange('companyName', e.target.value)}
+              className="col-span-3"
+            />
+          </div>
+          
+          <div className="grid grid-cols-4 items-center gap-4">
+            <Label htmlFor="email" className="text-right">
+              Email
+            </Label>
+            <Input
+              id="email"
+              type="email"
+              value={form.email}
+              onChange={(e) => handleChange('email', e.target.value)}
+              className="col-span-3"
+            />
+          </div>
+          
+          <div className="grid grid-cols-4 items-center gap-4">
+            <Label htmlFor="phone" className="text-right">
+              Phone
+            </Label>
+            <Input
+              id="phone"
+              value={form.phone}
+              onChange={(e) => handleChange('phone', e.target.value)}
+              className="col-span-3"
+            />
+          </div>
+        </div>
+        
+        <DialogFooter>
+          <Button type="button" variant="outline" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button type="submit" onClick={handleSubmit} disabled={isSubmitting}>
+            {isSubmitting ? 'Creating...' : 'Create Supplier'}
+          </Button>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );
 };
 
-// Default export
-export default CreateSupplierModal;

@@ -42,6 +42,21 @@ bun dev
 
 4. Open [http://localhost:3000](http://localhost:3000) in your browser to see the application.
 
+## 📸 Screenshots
+
+Here are some screenshots of the application:
+
+### Dashboard Overview
+![Dashboard](./docs/assets/images/dashboard.png)
+
+### Product Management
+![Product Management](./docs/assets/images/product-management.png)
+
+### User Interface
+![User Interface](./docs/assets/images/ui-components.png)
+
+*Note: Add your application screenshots to the `docs/assets/images/` directory with appropriate names.*
+
 ## 📁 Project Structure
 
 ```

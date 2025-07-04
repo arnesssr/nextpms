@@ -11,9 +11,27 @@ import {
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || '/api';
 
+// Development mode check - bypass API calls if Supabase is not configured
+const isDevelopmentMode = () => {
+  return !process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+};
+
 const supplierService = {
   // Get all suppliers with pagination and filters
   getSuppliers: async (filters?: SupplierFilters): Promise<SuppliersResponse> => {
+    // Return mock data immediately in development mode
+    if (isDevelopmentMode()) {
+      console.warn('🔧 Development mode: Supabase not configured, using mock data');
+      return {
+        data: [],
+        pagination: {
+          page: 1,
+          limit: 50,
+          total: 0,
+          pages: 1
+        }
+      };
+    }
     try {
       const queryParams = new URLSearchParams();
       
@@ -204,6 +222,34 @@ const supplierService = {
 
   // Get supplier statistics
   getSupplierStats: async (): Promise<{ success: boolean; data: SupplierSummary }> => {
+    // Return mock stats immediately in development mode
+    if (isDevelopmentMode()) {
+      console.warn('🔧 Development mode: Supabase not configured, using mock stats');
+      return {
+        success: true,
+        data: {
+          total_suppliers: 2,
+          active_suppliers: 2,
+          inactive_suppliers: 0,
+          suspended_suppliers: 0,
+          pending_suppliers: 0,
+          total_orders: 0,
+          total_order_value: 0,
+          average_rating: 4.5,
+          suppliers_by_type: [
+            { type: 'manufacturer', count: 1 },
+            { type: 'distributor', count: 1 }
+          ],
+          suppliers_by_performance: [
+            { rating: 'excellent', count: 1 },
+            { rating: 'good', count: 1 }
+          ],
+          top_suppliers: [],
+          recent_suppliers: []
+        }
+      };
+    }
+    
     try {
       const response = await fetch(`${API_BASE_URL}/suppliers/summary`);
       

@@ -1,175 +1,144 @@
 import { useState, useEffect, useCallback } from 'react';
+import { Supplier, SupplierFilters, SupplierFormData, SupplierStats } from '../types/suppliers.types';
 import { suppliersService } from '../services/suppliersService';
-import { Supplier, SupplierFilters, SupplierSummary, CreateSupplierRequest, UpdateSupplierRequest } from '../types/suppliersTypes';
 
-export interface UseSuppliersReturn {
+interface UseSuppliers {
   suppliers: Supplier[];
+  stats: SupplierStats | null;
   loading: boolean;
   error: string | null;
-  totalCount: number;
-  currentPage: number;
-  totalPages: number;
-  summary: SupplierSummary | null;
-  filters: SupplierFilters;
-  
-  // Actions
-  fetchSuppliers: () => Promise<void>;
-  createSupplier: (data: CreateSupplierRequest) => Promise<Supplier>;
-  updateSupplier: (id: string, data: UpdateSupplierRequest) => Promise<Supplier>;
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+  };
+  fetchSuppliers: (filters?: SupplierFilters, page?: number) => Promise<void>;
+  createSupplier: (data: SupplierFormData) => Promise<Supplier>;
+  updateSupplier: (id: string, data: Partial<SupplierFormData>) => Promise<Supplier>;
   deleteSupplier: (id: string) => Promise<void>;
-  setFilters: (filters: Partial<SupplierFilters>) => void;
-  setPage: (page: number) => void;
-  refreshSummary: () => Promise<void>;
-  clearError: () => void;
+  getSupplierById: (id: string) => Promise<Supplier | null>;
 }
 
-export const useSuppliers = (initialFilters?: Partial<SupplierFilters>): UseSuppliersReturn => {
+export function useSuppliers(initialFilters: SupplierFilters = {}): UseSuppliers {
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
+  const [stats, setStats] = useState<SupplierStats | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [totalCount, setTotalCount] = useState(0);
-  const [currentPage, setCurrentPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(0);
-  const [summary, setSummary] = useState<SupplierSummary | null>(null);
-  const [filters, setFiltersState] = useState<SupplierFilters>({
+  const [pagination, setPagination] = useState({
     page: 1,
     limit: 10,
-    search: '',
-    status: undefined,
-    business_type: undefined,
-    supplier_type: undefined,
-    performance_status: undefined,
-    sort_by: 'name',
-    sort_order: 'asc',
-    ...initialFilters
+    total: 0,
+    totalPages: 0
   });
 
-  const fetchSuppliers = useCallback(async () => {
+  const fetchSuppliers = useCallback(async (filters: SupplierFilters = initialFilters, page: number = 1) => {
     try {
       setLoading(true);
       setError(null);
       
-      const response = await suppliersService.fetchSuppliers(filters);
+      const response = await suppliersService.getSuppliers(filters, page, pagination.limit);
       
-      setSuppliers(response.data);
-      setTotalCount(response.pagination.total);
-      setCurrentPage(response.pagination.page);
-      setTotalPages(response.pagination.pages);
+      setSuppliers(response.suppliers);
+      setStats(response.stats);
+      setPagination(response.pagination);
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to fetch suppliers';
-      setError(errorMessage);
-      console.error('Error fetching suppliers:', err);
+      setError(err instanceof Error ? err.message : 'Failed to fetch suppliers');
     } finally {
       setLoading(false);
     }
-  }, [filters]);
+  }, [initialFilters, pagination.limit]);
 
-  const createSupplier = useCallback(async (data: CreateSupplierRequest): Promise<Supplier> => {
+  const createSupplier = useCallback(async (data: SupplierFormData): Promise<Supplier> => {
     try {
+      setLoading(true);
       setError(null);
       
       const newSupplier = await suppliersService.createSupplier(data);
       
-      // Add to current list if it matches filters
-      setSuppliers(prev => [newSupplier, ...prev]);
-      setTotalCount(prev => prev + 1);
+      // Refresh the suppliers list
+      await fetchSuppliers();
       
       return newSupplier;
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to create supplier';
       setError(errorMessage);
-      throw err;
+      throw new Error(errorMessage);
+    } finally {
+      setLoading(false);
     }
-  }, []);
+  }, [fetchSuppliers]);
 
-  const updateSupplier = useCallback(async (id: string, data: UpdateSupplierRequest): Promise<Supplier> => {
+  const updateSupplier = useCallback(async (id: string, data: Partial<SupplierFormData>): Promise<Supplier> => {
     try {
+      setLoading(true);
       setError(null);
       
       const updatedSupplier = await suppliersService.updateSupplier(id, data);
       
-      // Update in current list
-      setSuppliers(prev => 
-        prev.map(supplier => 
-          supplier.id === id ? updatedSupplier : supplier
-        )
-      );
+      // Update the supplier in the current list
+      setSuppliers(prev => prev.map(supplier => 
+        supplier.id === id ? updatedSupplier : supplier
+      ));
       
       return updatedSupplier;
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to update supplier';
       setError(errorMessage);
-      throw err;
+      throw new Error(errorMessage);
+    } finally {
+      setLoading(false);
     }
   }, []);
 
   const deleteSupplier = useCallback(async (id: string): Promise<void> => {
     try {
+      setLoading(true);
       setError(null);
       
       await suppliersService.deleteSupplier(id);
       
-      // Remove from current list
+      // Remove the supplier from the current list
       setSuppliers(prev => prev.filter(supplier => supplier.id !== id));
-      setTotalCount(prev => prev - 1);
+      
+      // Update stats
+      if (stats) {
+        setStats(prev => prev ? { ...prev, total: prev.total - 1 } : null);
+      }
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to delete supplier';
       setError(errorMessage);
-      throw err;
+      throw new Error(errorMessage);
+    } finally {
+      setLoading(false);
     }
-  }, []);
+  }, [stats]);
 
-  const setFilters = useCallback((newFilters: Partial<SupplierFilters>) => {
-    setFiltersState(prev => ({
-      ...prev,
-      ...newFilters,
-      page: newFilters.page || 1 // Reset to first page when filters change
-    }));
-  }, []);
-
-  const setPage = useCallback((page: number) => {
-    setFiltersState(prev => ({ ...prev, page }));
-  }, []);
-
-  const refreshSummary = useCallback(async () => {
+  const getSupplierById = useCallback(async (id: string): Promise<Supplier | null> => {
     try {
-      const summaryData = await suppliersService.fetchSupplierSummary();
-      setSummary(summaryData);
+      setError(null);
+      return await suppliersService.getSupplierById(id);
     } catch (err) {
-      console.error('Error fetching supplier summary:', err);
+      setError(err instanceof Error ? err.message : 'Failed to fetch supplier');
+      return null;
     }
   }, []);
 
-  const clearError = useCallback(() => {
-    setError(null);
-  }, []);
-
-  // Fetch suppliers when filters change
+  // Fetch suppliers on mount
   useEffect(() => {
     fetchSuppliers();
   }, [fetchSuppliers]);
 
-  // Fetch summary on mount
-  useEffect(() => {
-    refreshSummary();
-  }, [refreshSummary]);
-
   return {
     suppliers,
+    stats,
     loading,
     error,
-    totalCount,
-    currentPage,
-    totalPages,
-    summary,
-    filters,
+    pagination,
     fetchSuppliers,
     createSupplier,
     updateSupplier,
     deleteSupplier,
-    setFilters,
-    setPage,
-    refreshSummary,
-    clearError
+    getSupplierById
   };
-};
+}
