@@ -2,7 +2,7 @@
 
 import { Button } from '@/components/ui/button';
 import { SidebarLayout } from '@/components/layout/Sidebar';
-import { AnalyticsTabs } from '@/components/analyticsTabs';
+import { AnalyticsModuleTabs } from './components';
 import { Download, RefreshCw } from 'lucide-react';
 
 export default function AnalyticsPage() {
@@ -30,7 +30,7 @@ export default function AnalyticsPage() {
         </div>
 
         {/* Analytics Tabs */}
-        <AnalyticsTabs />
+        <AnalyticsModuleTabs />
       </div>
     </SidebarLayout>
   );
