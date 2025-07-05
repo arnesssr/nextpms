@@ -7,6 +7,8 @@ import { SecuritySettings } from '@/components/forms/SecuritySettings';
 import { NotificationSettings } from '@/components/forms/NotificationSettings';
 import IntegrationSettings from '@/components/forms/IntegrationSettings';
 import SystemSettings from '@/components/forms/SystemSettings';
+import CompanySettings from '@/components/forms/CompanySettings';
+import InvoiceSettings from '@/components/forms/InvoiceSettings';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -22,7 +24,9 @@ import {
   AlertCircle,
   CheckCircle,
   Download,
-  Upload
+  Upload,
+  Building2,
+  Receipt
 } from 'lucide-react';
 
 export default function SettingsPage() {
@@ -74,6 +78,20 @@ export default function SettingsPage() {
       icon: Bell,
       description: 'Email and push notification preferences',
       component: NotificationSettings
+    },
+    {
+      value: 'company',
+      label: 'Company',
+      icon: Building2,
+      description: 'Company information and branding',
+      component: CompanySettings
+    },
+    {
+      value: 'invoice',
+      label: 'Invoice',
+      icon: Receipt,
+      description: 'Invoice templates and settings',
+      component: InvoiceSettings
     },
     {
       value: 'integrations',
@@ -141,7 +159,7 @@ export default function SettingsPage() {
         {/* Settings Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-3 sm:space-y-4 md:space-y-6">
           <div className="overflow-x-auto pb-1">
-            <TabsList className="grid w-full grid-cols-5 min-w-[350px] gap-1 h-auto p-1 sm:min-w-0">
+            <TabsList className="grid w-full grid-cols-4 md:grid-cols-7 min-w-[350px] gap-1 h-auto p-1 sm:min-w-0">
               {settingsTabs.map((tab) => {
                 const Icon = tab.icon;
                 return (
