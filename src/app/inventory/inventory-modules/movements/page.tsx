@@ -21,11 +21,17 @@ import { toast } from 'sonner';
 export default function MovementsPage() {
   const {
     movements,
+    suppliers,
+    locations,
     loading,
     creating,
     error,
+    suppliersLoading,
+    locationsLoading,
     filter,
     loadMovements,
+    loadSuppliers,
+    loadLocations,
     createMovement,
     deleteMovement,
     setFilter,
@@ -44,10 +50,14 @@ export default function MovementsPage() {
   }, [isStockInModalOpen, isStockOutModalOpen]);
   const [selectedMovement, setSelectedMovement] = useState<Movement | null>(null);
 
-  // Mock data for dropdowns
-  const locations = ['Warehouse A', 'Warehouse B', 'Store Front', 'Distribution Center'];
-  const suppliers = ['AudioTech Ltd', 'SmartTech Corp', 'ElectroSupply Inc', 'TechVendor Co'];
+  // Customer data (still hardcoded for stock out)
   const customers = ['Tech Solutions Inc', 'Digital Corp', 'Innovation Labs', 'Future Systems'];
+
+  // Load suppliers and locations on mount
+  React.useEffect(() => {
+    loadSuppliers();
+    loadLocations();
+  }, [loadSuppliers, loadLocations]);
 
   const handleStockInSave = async (request: CreateMovementRequest) => {
     console.log('Saving stock in request:', request);

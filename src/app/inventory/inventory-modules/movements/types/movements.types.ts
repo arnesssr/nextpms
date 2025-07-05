@@ -34,21 +34,14 @@ export enum MovementType {
 export enum MovementReason {
   // Stock In reasons
   PURCHASE = 'purchase',
-  RETURN_FROM_CUSTOMER = 'return_from_customer',
-  TRANSFER_IN = 'transfer_in',
-  PRODUCTION = 'production',
-  ADJUSTMENT_IN = 'adjustment_in',
+  RETURN = 'return',
+  TRANSFER = 'transfer',
+  ADJUSTMENT = 'adjustment',
+  MANUAL = 'manual',
   
   // Stock Out reasons
   SALE = 'sale',
-  RETURN_TO_SUPPLIER = 'return_to_supplier',
-  TRANSFER_OUT = 'transfer_out',
-  DAMAGED = 'damaged',
-  EXPIRED = 'expired',
-  LOST = 'lost',
-  ADJUSTMENT_OUT = 'adjustment_out',
-  SAMPLE = 'sample',
-  INTERNAL_USE = 'internal_use'
+  DAMAGE = 'damage'
 }
 
 export interface MovementFilter {

@@ -12,11 +12,15 @@ export interface UseMovementsReturn {
   // Data
   movements: Movement[];
   movementsByProduct: MovementsByProduct[];
+  suppliers: string[];
+  locations: string[];
   
   // Loading states
   loading: boolean;
   creating: boolean;
   deleting: boolean;
+  suppliersLoading: boolean;
+  locationsLoading: boolean;
   
   // Error state
   error: string | null;
@@ -27,6 +31,8 @@ export interface UseMovementsReturn {
   // Actions
   loadMovements: () => Promise<void>;
   loadMovementsByProduct: () => Promise<void>;
+  loadSuppliers: () => Promise<void>;
+  loadLocations: () => Promise<void>;
   createMovement: (request: CreateMovementRequest) => Promise<Movement | null>;
   createBulkMovements: (request: BulkMovementRequest) => Promise<Movement[] | null>;
   deleteMovement: (id: string) => Promise<boolean>;
@@ -41,9 +47,13 @@ export function useMovements(initialFilterOverride?: MovementFilter): UseMovemen
   // State
   const [movements, setMovements] = useState<Movement[]>([]);
   const [movementsByProduct, setMovementsByProduct] = useState<MovementsByProduct[]>([]);
+  const [suppliers, setSuppliers] = useState<string[]>([]);
+  const [locations, setLocations] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const [creating, setCreating] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [suppliersLoading, setSuppliersLoading] = useState(false);
+  const [locationsLoading, setLocationsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilterState] = useState<MovementFilter>({
     ...initialFilter,
@@ -86,6 +96,36 @@ export function useMovements(initialFilterOverride?: MovementFilter): UseMovemen
       console.error('Error loading movements by product:', err);
     }
   }, [filter]);
+
+  // Load suppliers
+  const loadSuppliers = useCallback(async () => {
+    try {
+      setSuppliersLoading(true);
+      
+      const data = await movementsService.getSuppliers();
+      setSuppliers(data);
+    } catch (err) {
+      console.error('Error loading suppliers:', err);
+      setSuppliers([]); // Set empty array on error
+    } finally {
+      setSuppliersLoading(false);
+    }
+  }, []);
+
+  // Load locations
+  const loadLocations = useCallback(async () => {
+    try {
+      setLocationsLoading(true);
+      
+      const data = await movementsService.getLocations();
+      setLocations(data);
+    } catch (err) {
+      console.error('Error loading locations:', err);
+      setLocations([]); // Set empty array on error
+    } finally {
+      setLocationsLoading(false);
+    }
+  }, []);
 
   // Create movement
   const createMovement = useCallback(async (request: CreateMovementRequest): Promise<Movement | null> => {
@@ -183,11 +223,15 @@ export function useMovements(initialFilterOverride?: MovementFilter): UseMovemen
     // Data
     movements,
     movementsByProduct,
+    suppliers,
+    locations,
     
     // Loading states
     loading,
     creating,
     deleting,
+    suppliersLoading,
+    locationsLoading,
     
     // Error state
     error,
@@ -198,6 +242,8 @@ export function useMovements(initialFilterOverride?: MovementFilter): UseMovemen
     // Actions
     loadMovements,
     loadMovementsByProduct,
+    loadSuppliers,
+    loadLocations,
     createMovement,
     createBulkMovements,
     deleteMovement,

@@ -13,6 +13,7 @@ const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || '/api';
 
 class MovementsService {
   private apiUrl = `${API_BASE_URL}/movements`;
+  private suppliersUrl = `${API_BASE_URL}/suppliers`;
 
   async getMovements(filter?: MovementFilter): Promise<Movement[]> {
     try {
@@ -87,6 +88,12 @@ class MovementsService {
 
   async createMovement(request: CreateMovementRequest): Promise<Movement> {
     try {
+      // Build notes with supplier info if provided
+      let notes = request.notes || '';
+      if (request.supplier) {
+        notes = notes ? `Supplier: ${request.supplier}. ${notes}` : `Supplier: ${request.supplier}`;
+      }
+      
       // Map frontend request to API format
       const apiRequest = {
         product_id: request.productId,
@@ -99,7 +106,7 @@ class MovementsService {
         location_from_name: request.warehouseId,
         unit_cost: request.unitCost || 0,
         reference_number: request.reference,
-        notes: request.notes,
+        notes: notes,
         created_by: 'current_user', // TODO: Get from auth context
         auto_process: true // Auto-complete the movement
       };
@@ -222,6 +229,50 @@ class MovementsService {
       }
     } catch (error) {
       console.error('Error deleting movement:', error);
+      throw error;
+    }
+  }
+
+  async getSuppliers(): Promise<string[]> {
+    try {
+      const response = await fetch(this.suppliersUrl);
+      
+      if (!response.ok) {
+        throw new Error(`Failed to load suppliers: ${response.statusText}`);
+      }
+      
+      const data = await response.json();
+      const supplierNames = data.data?.map((s: any) => s.name) || [];
+      
+      // Remove duplicates
+      const uniqueSuppliers = [...new Set(supplierNames)];
+      console.log('Loaded suppliers from API:', uniqueSuppliers);
+      
+      return uniqueSuppliers;
+    } catch (error) {
+      console.error('Error fetching suppliers:', error);
+      throw error;
+    }
+  }
+
+  async getLocations(): Promise<string[]> {
+    try {
+      const response = await fetch(`${API_BASE_URL}/warehouses`);
+      
+      if (!response.ok) {
+        throw new Error(`Failed to load warehouses: ${response.statusText}`);
+      }
+      
+      const data = await response.json();
+      const warehouseNames = data.data?.map((w: any) => w.name) || [];
+      
+      // Remove duplicates
+      const uniqueLocations = [...new Set(warehouseNames)];
+      console.log('Loaded locations from API:', uniqueLocations);
+      
+      return uniqueLocations;
+    } catch (error) {
+      console.error('Error fetching locations:', error);
       throw error;
     }
   }

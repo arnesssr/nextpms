@@ -115,19 +115,19 @@ export function StockInModal({ isOpen, onClose, onSave, locations, suppliers }: 
   // Stock in reasons
   const stockInReasons = [
     { value: MovementReason.PURCHASE, label: 'Purchase' },
-    { value: MovementReason.RETURN_FROM_CUSTOMER, label: 'Customer Return' },
-    { value: MovementReason.TRANSFER_IN, label: 'Transfer In' },
-    { value: MovementReason.PRODUCTION, label: 'Production' },
-    { value: MovementReason.ADJUSTMENT_IN, label: 'Adjustment In' }
+    { value: MovementReason.RETURN, label: 'Return' },
+    { value: MovementReason.TRANSFER, label: 'Transfer' },
+    { value: MovementReason.ADJUSTMENT, label: 'Adjustment' },
+    { value: MovementReason.MANUAL, label: 'Manual Entry' }
   ];
 
   const getReasonIcon = (reason: MovementReason) => {
     switch (reason) {
       case MovementReason.PURCHASE:
         return <Truck className="h-4 w-4 text-blue-500" />;
-      case MovementReason.RETURN_FROM_CUSTOMER:
+      case MovementReason.RETURN:
         return <Package className="h-4 w-4 text-green-500" />;
-      case MovementReason.PRODUCTION:
+      case MovementReason.MANUAL:
         return <Package className="h-4 w-4 text-purple-500" />;
       default:
         return <Package className="h-4 w-4 text-muted-foreground" />;
@@ -278,8 +278,8 @@ export function StockInModal({ isOpen, onClose, onSave, locations, suppliers }: 
             </div>
           </div>
 
-          {/* Supplier (only for purchases) */}
-          {reason === MovementReason.PURCHASE && (
+          {/* Supplier (for purchases and returns) */}
+          {(reason === MovementReason.PURCHASE || reason === MovementReason.RETURN) && (
             <div className="space-y-2">
               <label className="text-sm font-medium">Supplier</label>
               <div className="flex items-center">

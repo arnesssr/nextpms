@@ -106,21 +106,16 @@ export function StockOutModal({ isOpen, onClose, onSave, locations, customers }:
   // Stock out reasons
   const stockOutReasons = [
     { value: MovementReason.SALE, label: 'Sale' },
-    { value: MovementReason.RETURN_TO_SUPPLIER, label: 'Return to Supplier' },
-    { value: MovementReason.TRANSFER_OUT, label: 'Transfer Out' },
-    { value: MovementReason.DAMAGED, label: 'Damaged' },
-    { value: MovementReason.EXPIRED, label: 'Expired' },
-    { value: MovementReason.LOST, label: 'Lost' },
-    { value: MovementReason.SAMPLE, label: 'Sample' },
-    { value: MovementReason.INTERNAL_USE, label: 'Internal Use' },
-    { value: MovementReason.ADJUSTMENT_OUT, label: 'Adjustment Out' }
+    { value: MovementReason.RETURN, label: 'Return to Supplier' },
+    { value: MovementReason.TRANSFER, label: 'Transfer Out' },
+    { value: MovementReason.DAMAGE, label: 'Damaged' },
+    { value: MovementReason.ADJUSTMENT, label: 'Adjustment' },
+    { value: MovementReason.MANUAL, label: 'Manual Entry' }
   ];
 
   const getReasonIcon = (reason: MovementReason) => {
     switch (reason) {
-      case MovementReason.DAMAGED:
-      case MovementReason.EXPIRED:
-      case MovementReason.LOST:
+      case MovementReason.DAMAGE:
         return <AlertTriangle className="h-4 w-4 text-red-500" />;
       default:
         return <Package className="h-4 w-4 text-muted-foreground" />;
@@ -294,7 +289,7 @@ export function StockOutModal({ isOpen, onClose, onSave, locations, customers }:
           </div>
 
           {/* Warning for problematic reasons */}
-          {[MovementReason.DAMAGED, MovementReason.EXPIRED, MovementReason.LOST].includes(reason) && (
+          {[MovementReason.DAMAGE].includes(reason) && (
             <Card className="border-amber-200 bg-amber-50">
               <CardContent className="p-3">
                 <div className="flex items-center">
