@@ -32,22 +32,28 @@ export function useSuppliers(initialFilters: SupplierFilters = {}): UseSuppliers
     totalPages: 0
   });
 
-  const fetchSuppliers = useCallback(async (filters: SupplierFilters = initialFilters, page: number = 1) => {
+  const fetchSuppliers = useCallback(async (filters: SupplierFilters = initialFilters, page: number = 1, limit: number = 10) => {
     try {
       setLoading(true);
       setError(null);
       
-      const response = await suppliersService.getSuppliers(filters, page, pagination.limit);
+      const response = await suppliersService.getSuppliers(filters, page, limit);
       
-      setSuppliers(response.suppliers);
-      setStats(response.stats);
-      setPagination(response.pagination);
+      // Handle the response properly
+      setSuppliers(response.suppliers || []);
+      setStats(response.stats || { total: 0, active: 0, inactive: 0, pending: 0, suspended: 0 });
+      setPagination(response.pagination || { page: 1, limit: 10, total: 0, totalPages: 0 });
+      
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch suppliers');
+      // Set empty state on error
+      setSuppliers([]);
+      setStats({ total: 0, active: 0, inactive: 0, pending: 0, suspended: 0 });
+      setPagination({ page: 1, limit: 10, total: 0, totalPages: 0 });
     } finally {
       setLoading(false);
     }
-  }, [initialFilters, pagination.limit]);
+  }, [initialFilters]);
 
   const createSupplier = useCallback(async (data: SupplierFormData): Promise<Supplier> => {
     try {
@@ -56,8 +62,18 @@ export function useSuppliers(initialFilters: SupplierFilters = {}): UseSuppliers
       
       const newSupplier = await suppliersService.createSupplier(data);
       
-      // Refresh the suppliers list
-      await fetchSuppliers();
+      // Optimized: Add supplier to local state instead of full refresh
+      setSuppliers(prev => [newSupplier, ...prev]);
+      
+      // Update stats locally
+      setStats(prev => prev ? {
+        ...prev,
+        total: prev.total + 1,
+        active: newSupplier.status === 'active' ? prev.active + 1 : prev.active,
+        pending: newSupplier.status === 'pending' ? prev.pending + 1 : prev.pending,
+        inactive: newSupplier.status === 'inactive' ? prev.inactive + 1 : prev.inactive,
+        suspended: newSupplier.status === 'suspended' ? prev.suspended + 1 : prev.suspended
+      } : { total: 1, active: 1, inactive: 0, pending: 0, suspended: 0 });
       
       return newSupplier;
     } catch (err) {
@@ -67,7 +83,7 @@ export function useSuppliers(initialFilters: SupplierFilters = {}): UseSuppliers
     } finally {
       setLoading(false);
     }
-  }, [fetchSuppliers]);
+  }, []);
 
   const updateSupplier = useCallback(async (id: string, data: Partial<SupplierFormData>): Promise<Supplier> => {
     try {
@@ -127,7 +143,8 @@ export function useSuppliers(initialFilters: SupplierFilters = {}): UseSuppliers
   // Fetch suppliers on mount
   useEffect(() => {
     fetchSuppliers();
-  }, [fetchSuppliers]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Only run on mount
 
   return {
     suppliers,

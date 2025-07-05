@@ -1,12 +1,48 @@
 import { Supplier, SupplierFormData, SupplierFilters, SuppliersResponse } from '../types/suppliers.types';
-import { supplierService } from '@/services/suppliers';
+// 🟩 LOW-LEVEL MODULE SERVICE
+// Purpose: Client-side HTTP calls to API routes
+// Used by: React components
+// Level: Client-side data management
+
+// Mapping functions to ensure form values match database constraints
+const mapBusinessType = (formType: string): string => {
+  // Form uses: 'manufacturer' | 'distributor' | 'retailer' | 'service_provider'
+  // DB allows: 'corporation', 'llc', 'partnership', 'sole_proprietorship', 'other'
+  
+  switch (formType) {
+    case 'manufacturer':
+    case 'distributor':
+    case 'retailer':
+      return 'corporation'; // Most business suppliers are corporations
+    case 'service_provider':
+      return 'llc'; // Service providers often LLCs
+    default:
+      return 'corporation';
+  }
+};
+
+const mapSupplierType = (formType: string): string => {
+  // Form uses: 'primary' | 'secondary' | 'backup'
+  // DB allows: 'manufacturer', 'distributor', 'wholesaler', 'service_provider', 'other'
+  
+  switch (formType) {
+    case 'primary':
+      return 'manufacturer';
+    case 'secondary':
+      return 'distributor';
+    case 'backup':
+      return 'wholesaler';
+    default:
+      return 'manufacturer';
+  }
+};
 
 // Transform global service types to module types
-const transformSupplierFromGlobal = (globalSupplier: any): Supplier => {
+function transformSupplierFromGlobal(globalSupplier: any): Supplier {
   return {
     id: globalSupplier.id,
-    name: globalSupplier.name,
-    companyName: globalSupplier.company_name || globalSupplier.name,
+    name: globalSupplier.primary_contact_name || globalSupplier.name,
+    companyName: globalSupplier.name, // Main name is company name in DB
     email: globalSupplier.email,
     phone: globalSupplier.phone,
     address: {
@@ -17,15 +53,19 @@ const transformSupplierFromGlobal = (globalSupplier: any): Supplier => {
       country: globalSupplier.country || ''
     },
     contactPerson: {
-      name: globalSupplier.contact_name || globalSupplier.name,
-      title: globalSupplier.contact_title || '',
-      email: globalSupplier.contact_email || globalSupplier.email,
-      phone: globalSupplier.contact_phone || globalSupplier.phone
+      name: globalSupplier.primary_contact_name || '',
+      title: '', // Not in DB schema yet
+      email: globalSupplier.primary_contact_email || globalSupplier.email,
+      phone: globalSupplier.primary_contact_phone || globalSupplier.phone
     },
     businessType: globalSupplier.business_type || 'manufacturer',
     supplierType: globalSupplier.supplier_type || 'primary',
     status: globalSupplier.status || 'active',
-    performanceRating: globalSupplier.performance_rating || 'average',
+    performanceRating: globalSupplier.rating ? (
+      globalSupplier.rating >= 4 ? 'excellent' :
+      globalSupplier.rating >= 3 ? 'good' :
+      globalSupplier.rating >= 2 ? 'average' : 'poor'
+    ) : 'average',
     paymentTerms: globalSupplier.payment_terms || '',
     taxId: globalSupplier.tax_id || '',
     website: globalSupplier.website || '',
@@ -33,29 +73,51 @@ const transformSupplierFromGlobal = (globalSupplier: any): Supplier => {
     createdAt: new Date(globalSupplier.created_at || globalSupplier.createdAt),
     updatedAt: new Date(globalSupplier.updated_at || globalSupplier.updatedAt)
   };
-};
+}
 
 const transformSupplierToGlobal = (moduleSupplier: SupplierFormData) => {
   return {
-    name: moduleSupplier.name,
-    company_name: moduleSupplier.companyName,
+    name: moduleSupplier.companyName, // Use company name as the main name
     email: moduleSupplier.email,
     phone: moduleSupplier.phone,
-    address_line_1: moduleSupplier.address.street,
-    city: moduleSupplier.address.city,
-    state: moduleSupplier.address.state,
-    postal_code: moduleSupplier.address.zipCode,
-    country: moduleSupplier.address.country,
-    contact_name: moduleSupplier.contactPerson.name,
-    contact_title: moduleSupplier.contactPerson.title,
-    contact_email: moduleSupplier.contactPerson.email,
-    contact_phone: moduleSupplier.contactPerson.phone,
-    business_type: moduleSupplier.businessType,
-    supplier_type: moduleSupplier.supplierType,
-    payment_terms: moduleSupplier.paymentTerms,
-    tax_id: moduleSupplier.taxId,
-    website: moduleSupplier.website,
-    notes: moduleSupplier.notes
+    website: moduleSupplier.website || null,
+    
+    // Address information
+    address_line_1: moduleSupplier.address.street || null,
+    address_line_2: null, // Not in form yet
+    city: moduleSupplier.address.city || null,
+    state: moduleSupplier.address.state || null,
+    postal_code: moduleSupplier.address.zipCode || null,
+    country: moduleSupplier.address.country || null,
+    
+    // Business information
+    tax_id: moduleSupplier.taxId || null,
+    business_registration: null, // Not in form yet
+    business_type: mapBusinessType(moduleSupplier.businessType),
+    
+    // Contact information
+    primary_contact_name: moduleSupplier.contactPerson.name || moduleSupplier.name,
+    primary_contact_email: moduleSupplier.contactPerson.email || moduleSupplier.email,
+    primary_contact_phone: moduleSupplier.contactPerson.phone || moduleSupplier.phone,
+    
+    // Payment and terms
+    payment_terms: moduleSupplier.paymentTerms || null,
+    credit_limit: null, // Not in form yet
+    currency: 'USD', // Default
+    
+    // Performance metrics
+    rating: null, // Will be set later
+    lead_time_days: null, // Not in form yet
+    minimum_order_amount: null, // Not in form yet
+    
+    // Status and categorization
+    status: 'active', // Default for new suppliers
+    supplier_type: mapSupplierType(moduleSupplier.supplierType),
+    category: null, // Not in form yet
+    
+    // Notes
+    notes: moduleSupplier.notes || null,
+    internal_notes: null // Not in form yet
   };
 };
 
@@ -83,28 +145,46 @@ class SuppliersService {
       globalFilters.page = page;
       globalFilters.limit = limit;
 
-      const response = await supplierService.getSuppliers(globalFilters);
+      // Make HTTP call to API route instead of direct service call
+      const queryParams = new URLSearchParams();
+      Object.entries(globalFilters).forEach(([key, value]) => {
+        if (value !== undefined && value !== null) {
+          queryParams.append(key, value.toString());
+        }
+      });
       
-      // Transform global service response to module format
-      const suppliers = response.data.map(transformSupplierFromGlobal);
+      const apiResponse = await fetch(`/api/suppliers?${queryParams.toString()}`);
+      if (!apiResponse.ok) {
+        throw new Error(`HTTP error! status: ${apiResponse.status}`);
+      }
       
-      // Get stats from global service with fallback
+      const apiData = await apiResponse.json();
+      if (!apiData.data) {
+        throw new Error('Invalid API response format');
+      }
+      
+      // Transform API response to module format
+      const suppliers = apiData.data.map(transformSupplierFromGlobal);
+      
+      // Get stats from API route with fallback
       let stats = { total: 0, active: 0, inactive: 0, pending: 0, suspended: 0 };
       
       try {
-        const statsResponse = await supplierService.getSupplierStats();
-        if (statsResponse.success && statsResponse.data) {
-          const globalStats = statsResponse.data;
-          stats = {
-            total: globalStats.total_suppliers || 0,
-            active: globalStats.active_suppliers || 0,
-            inactive: globalStats.inactive_suppliers || 0,
-            pending: globalStats.pending_suppliers || 0,
-            suspended: globalStats.suspended_suppliers || 0
-          };
+        const statsResponse = await fetch('/api/suppliers/summary');
+        if (statsResponse.ok) {
+          const statsData = await statsResponse.json();
+          if (statsData.data) {
+            const globalStats = statsData.data;
+            stats = {
+              total: globalStats.total_suppliers || 0,
+              active: globalStats.active_suppliers || 0,
+              inactive: globalStats.inactive_suppliers || 0,
+              pending: globalStats.pending_suppliers || 0,
+              suspended: globalStats.suspended_suppliers || 0
+            };
+          }
         }
       } catch (statsError) {
-        console.warn('Could not fetch supplier stats, using defaults:', statsError);
         // Use supplier count from current response
         stats.total = suppliers.length;
         stats.active = suppliers.filter(s => s.status === 'active').length;
@@ -113,9 +193,9 @@ class SuppliersService {
         stats.suspended = suppliers.filter(s => s.status === 'suspended').length;
       }
 
-      return {
+      const result = {
         suppliers,
-        pagination: response.pagination || {
+        pagination: apiData.pagination || {
           page,
           limit,
           total: suppliers.length,
@@ -123,135 +203,28 @@ class SuppliersService {
         },
         stats
       };
+      
+      return result;
     } catch (error) {
       console.error('Error fetching suppliers:', error);
-      
-      // If it's a database/API error, provide development fallback data
-      if (error instanceof Error && (error.message.includes('Failed to fetch') || error.message.includes('Internal Server Error'))) {
-        console.warn('Database not available, using fallback data for development');
-        return this.getFallbackData(filters, page, limit);
-      }
-      
-      // Return empty result for other errors
-      return {
-        suppliers: [],
-        pagination: { page: 1, limit: 10, total: 0, totalPages: 0 },
-        stats: { total: 0, active: 0, inactive: 0, pending: 0, suspended: 0 }
-      };
+      throw new Error(error instanceof Error ? error.message : 'Failed to fetch suppliers');
     }
   }
   
-  // Fallback data for development when database is not available
-  private getFallbackData(filters: SupplierFilters = {}, page: number = 1, limit: number = 10): SuppliersResponse {
-    const mockSuppliers: Supplier[] = [
-      {
-        id: '1',
-        name: 'John Smith',
-        companyName: 'Tech Components Ltd',
-        email: 'john@techcomponents.com',
-        phone: '+1-555-0123',
-        address: {
-          street: '123 Business Ave',
-          city: 'San Francisco',
-          state: 'CA',
-          zipCode: '94102',
-          country: 'USA'
-        },
-        contactPerson: {
-          name: 'John Smith',
-          title: 'Sales Manager',
-          email: 'john@techcomponents.com',
-          phone: '+1-555-0123'
-        },
-        businessType: 'manufacturer',
-        supplierType: 'primary',
-        status: 'active',
-        performanceRating: 'excellent',
-        paymentTerms: 'Net 30',
-        taxId: 'TX123456789',
-        website: 'https://techcomponents.com',
-        notes: 'Reliable supplier for electronic components',
-        createdAt: new Date('2024-01-15'),
-        updatedAt: new Date('2024-12-01')
-      },
-      {
-        id: '2',
-        name: 'Sarah Wilson',
-        companyName: 'Global Parts Supply',
-        email: 'sarah@globalparts.com',
-        phone: '+1-555-0456',
-        address: {
-          street: '456 Industrial Blvd',
-          city: 'Chicago',
-          state: 'IL',
-          zipCode: '60601',
-          country: 'USA'
-        },
-        contactPerson: {
-          name: 'Sarah Wilson',
-          title: 'Account Manager',
-          email: 'sarah@globalparts.com',
-          phone: '+1-555-0456'
-        },
-        businessType: 'distributor',
-        supplierType: 'secondary',
-        status: 'active',
-        performanceRating: 'good',
-        paymentTerms: 'Net 45',
-        taxId: 'TX987654321',
-        website: 'https://globalparts.com',
-        notes: 'Good backup supplier for automotive parts',
-        createdAt: new Date('2024-02-20'),
-        updatedAt: new Date('2024-11-15')
-      }
-    ];
-    
-    // Apply basic filtering
-    let filteredSuppliers = [...mockSuppliers];
-    
-    if (filters.search) {
-      const searchLower = filters.search.toLowerCase();
-      filteredSuppliers = filteredSuppliers.filter(supplier =>
-        supplier.name.toLowerCase().includes(searchLower) ||
-        supplier.companyName.toLowerCase().includes(searchLower) ||
-        supplier.email.toLowerCase().includes(searchLower)
-      );
-    }
-    
-    if (filters.status) {
-      filteredSuppliers = filteredSuppliers.filter(supplier => supplier.status === filters.status);
-    }
-    
-    // Calculate stats
-    const stats = {
-      total: mockSuppliers.length,
-      active: mockSuppliers.filter(s => s.status === 'active').length,
-      inactive: mockSuppliers.filter(s => s.status === 'inactive').length,
-      pending: mockSuppliers.filter(s => s.status === 'pending').length,
-      suspended: mockSuppliers.filter(s => s.status === 'suspended').length
-    };
-    
-    // Pagination
-    const startIndex = (page - 1) * limit;
-    const endIndex = startIndex + limit;
-    const paginatedSuppliers = filteredSuppliers.slice(startIndex, endIndex);
-    
-    return {
-      suppliers: paginatedSuppliers,
-      pagination: {
-        page,
-        limit,
-        total: filteredSuppliers.length,
-        totalPages: Math.ceil(filteredSuppliers.length / limit)
-      },
-      stats
-    };
-  }
 
   async getSupplierById(id: string): Promise<Supplier | null> {
     try {
-      const response = await supplierService.getSupplier(id);
-      return transformSupplierFromGlobal(response.data);
+      const apiResponse = await fetch(`/api/suppliers/${id}`);
+      if (!apiResponse.ok) {
+        throw new Error(`HTTP error! status: ${apiResponse.status}`);
+      }
+      
+      const apiData = await apiResponse.json();
+      if (!apiData.data) {
+        throw new Error('Invalid API response format');
+      }
+      
+      return transformSupplierFromGlobal(apiData.data);
     } catch (error) {
       console.error('Error fetching supplier by ID:', error);
       return null;
@@ -261,52 +234,52 @@ class SuppliersService {
   async createSupplier(supplierData: SupplierFormData): Promise<Supplier> {
     try {
       const globalData = transformSupplierToGlobal(supplierData);
-      const response = await supplierService.createSupplier(globalData);
-      return transformSupplierFromGlobal(response.data);
+      
+      const apiResponse = await fetch('/api/suppliers', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(globalData),
+      });
+      
+      if (!apiResponse.ok) {
+        throw new Error(`HTTP error! status: ${apiResponse.status}`);
+      }
+      
+      const apiData = await apiResponse.json();
+      if (!apiData.data) {
+        throw new Error('Invalid API response format');
+      }
+      
+      return transformSupplierFromGlobal(apiData.data);
     } catch (error) {
-      console.error('Error creating supplier - Full error object:', error);
-      console.error('Error message:', error instanceof Error ? error.message : 'Unknown error');
-      console.error('Error type:', typeof error);
-      
-      // For development, always use fallback when database is not properly set up
-      // This catches all types of database/API errors
-      console.warn('Database/API error detected, creating mock supplier for development');
-      
-      // Create a mock supplier with the form data
-      const mockSupplier: Supplier = {
-        id: Date.now().toString(), // Generate a unique ID
-        name: supplierData.name,
-        companyName: supplierData.companyName,
-        email: supplierData.email,
-        phone: supplierData.phone,
-        address: supplierData.address,
-        contactPerson: supplierData.contactPerson,
-        businessType: supplierData.businessType,
-        supplierType: supplierData.supplierType,
-        status: 'pending', // Default status for new suppliers
-        performanceRating: 'average', // Default rating
-        paymentTerms: supplierData.paymentTerms,
-        taxId: supplierData.taxId,
-        website: supplierData.website,
-        notes: supplierData.notes,
-        createdAt: new Date(),
-        updatedAt: new Date()
-      };
-      
-      console.log('✅ Mock supplier created successfully:', mockSupplier);
-      
-      // Simulate a small delay to make it feel more realistic
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
-      return mockSupplier;
+      throw new Error(error instanceof Error ? error.message : 'Failed to create supplier');
     }
   }
 
   async updateSupplier(id: string, supplierData: Partial<SupplierFormData>): Promise<Supplier> {
     try {
       const globalData = transformSupplierToGlobal(supplierData as SupplierFormData);
-      const response = await supplierService.updateSupplier(id, globalData);
-      return transformSupplierFromGlobal(response.data);
+      
+      const apiResponse = await fetch(`/api/suppliers/${id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(globalData),
+      });
+      
+      if (!apiResponse.ok) {
+        throw new Error(`HTTP error! status: ${apiResponse.status}`);
+      }
+      
+      const apiData = await apiResponse.json();
+      if (!apiData.data) {
+        throw new Error('Invalid API response format');
+      }
+      
+      return transformSupplierFromGlobal(apiData.data);
     } catch (error) {
       console.error('Error updating supplier:', error);
       throw new Error(error instanceof Error ? error.message : 'Failed to update supplier');
@@ -315,7 +288,13 @@ class SuppliersService {
 
   async deleteSupplier(id: string): Promise<void> {
     try {
-      await supplierService.deleteSupplier(id);
+      const apiResponse = await fetch(`/api/suppliers/${id}`, {
+        method: 'DELETE',
+      });
+      
+      if (!apiResponse.ok) {
+        throw new Error(`HTTP error! status: ${apiResponse.status}`);
+      }
     } catch (error) {
       console.error('Error deleting supplier:', error);
       throw new Error(error instanceof Error ? error.message : 'Failed to delete supplier');

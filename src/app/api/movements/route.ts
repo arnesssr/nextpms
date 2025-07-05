@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabaseClient';
+import { createServerSupabaseAnonymousClient } from '@/lib/supabaseServer';
 
 export async function GET(request: NextRequest) {
   try {
@@ -12,6 +12,8 @@ export async function GET(request: NextRequest) {
 
     console.log('Fetching movements with params:', { product_id, movement_type, location_id, days, limit });
 
+    const supabase = createServerSupabaseAnonymousClient();
+    
     // First check if stock_movements table exists
     const { data: testData, error: testError } = await supabase
       .from('stock_movements')
@@ -78,8 +80,15 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
+    console.log('🔑 Environment check:');
+    console.log('  NEXT_PUBLIC_SUPABASE_URL:', !!process.env.NEXT_PUBLIC_SUPABASE_URL);
+    console.log('  SUPABASE_SERVICE_ROLE_KEY:', !!process.env.SUPABASE_SERVICE_ROLE_KEY);
+    
+    const supabase = createServerSupabaseAnonymousClient();
+    console.log('✅ Service role client created successfully');
+    
     const body = await request.json();
-    console.log('Received movement creation request:', body);
+    console.log('📦 Received movement creation request:', body);
     
     // Validate required fields
     if (!body.product_id) {
@@ -141,7 +150,7 @@ export async function POST(request: NextRequest) {
       reference_type: body.reference_type || null,
       reference_id: body.reference_id || null,
       reference_number: body.reference_number || null,
-      notes: body.notes || null,
+      reason_description: body.notes || null,
       created_by: body.created_by || 'system',
       status: body.auto_process ? 'completed' : 'pending'
     };

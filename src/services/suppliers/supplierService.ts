@@ -8,116 +8,106 @@ import {
   SupplierSummary,
   SupplierStatus 
 } from '@/types/supplier.types';
+import { createServerSupabaseClient } from '@/lib/supabaseServer';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || '/api';
-
-// Development mode check - bypass API calls if Supabase is not configured
-const isDevelopmentMode = () => {
-  return !process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-};
+// 🟦 HIGH-LEVEL GLOBAL SERVICE
+// Purpose: Business logic layer with direct Supabase database access
+// Used by: API routes in src/app/api/suppliers/*
+// Level: Core business operations
 
 const supplierService = {
   // Get all suppliers with pagination and filters
   getSuppliers: async (filters?: SupplierFilters): Promise<SuppliersResponse> => {
-    // Return mock data immediately in development mode
-    if (isDevelopmentMode()) {
-      console.warn('🔧 Development mode: Supabase not configured, using mock data');
-      return {
-        data: [],
-        pagination: {
-          page: 1,
-          limit: 50,
-          total: 0,
-          pages: 1
-        }
-      };
-    }
     try {
-      const queryParams = new URLSearchParams();
+      const supabase = createServerSupabaseClient();
+      let query = supabase.from('suppliers').select('*', { count: 'exact' });
       
-      if (filters) {
-        Object.entries(filters).forEach(([key, value]) => {
-          if (value !== undefined && value !== null) {
-            queryParams.append(key, value.toString());
-          }
-        });
+      // Apply filters
+      if (filters?.search) {
+        query = query.or(`name.ilike.%${filters.search}%,email.ilike.%${filters.search}%,phone.ilike.%${filters.search}%`);
       }
       
-      const url = `${API_BASE_URL}/suppliers${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
-      const response = await fetch(url);
-      
-      if (!response.ok) {
-        throw new Error(`Failed to fetch suppliers: ${response.statusText}`);
+      if (filters?.status) {
+        query = query.eq('status', filters.status);
       }
       
-      const data = await response.json();
-      
-      // Ensure response format matches expected structure
-      if (data.data) {
-        return {
-          data: data.data.map((supplier: any) => ({
-            ...supplier,
-            address: [supplier.address_line_1, supplier.address_line_2, supplier.city, supplier.state]
-              .filter(Boolean)
-              .join(', '),
-            createdAt: supplier.created_at,
-            updatedAt: supplier.updated_at
-          })),
-          pagination: data.pagination || {
-            page: 1,
-            limit: data.data.length,
-            total: data.data.length,
-            pages: 1
-          }
-        };
+      if (filters?.business_type) {
+        query = query.eq('business_type', filters.business_type);
       }
       
-      // Handle direct array response
+      if (filters?.supplier_type) {
+        query = query.eq('supplier_type', filters.supplier_type);
+      }
+      
+      // Apply sorting
+      if (filters?.sort_by) {
+        const order = filters.sort_order === 'desc' ? { ascending: false } : { ascending: true };
+        query = query.order(filters.sort_by, order);
+      } else {
+        query = query.order('name', { ascending: true });
+      }
+      
+      // Apply pagination
+      const page = filters?.page || 1;
+      const limit = filters?.limit || 20;
+      const from = (page - 1) * limit;
+      const to = from + limit - 1;
+      
+      query = query.range(from, to);
+      
+      const { data, error, count } = await query;
+      
+      if (error) {
+        throw new Error(error.message);
+      }
+      
+      const total = count || 0;
+      const totalPages = Math.ceil(total / limit);
+      
       return {
-        data: data.map((supplier: any) => ({
-          ...supplier,
-          address: [supplier.address_line_1, supplier.address_line_2, supplier.city, supplier.state]
-            .filter(Boolean)
-            .join(', '),
-          createdAt: supplier.created_at,
-          updatedAt: supplier.updated_at
-        })),
+        data: data || [],
         pagination: {
-          page: 1,
-          limit: data.length,
-          total: data.length,
-          pages: 1
+          page,
+          limit,
+          total,
+          pages: totalPages
         }
       };
     } catch (error) {
       console.error('Error fetching suppliers:', error);
-      throw new Error(error instanceof Error ? error.message : 'Failed to fetch suppliers');
+      throw new Error('Failed to fetch suppliers');
     }
   },
 
   // Get single supplier by ID
   getSupplier: async (id: string): Promise<SupplierResponse> => {
     try {
-      const response = await fetch(`${API_BASE_URL}/suppliers/${id}`);
+      const supabase = createServerSupabaseClient();
+      const { data, error } = await supabase
+        .from('suppliers')
+        .select('*')
+        .eq('id', id)
+        .single();
       
-      if (!response.ok) {
-        if (response.status === 404) {
+      if (error) {
+        if (error.code === 'PGRST116') {
           throw new Error('Supplier not found');
         }
-        throw new Error(`Failed to fetch supplier: ${response.statusText}`);
+        throw new Error(error.message);
       }
       
-      const data = await response.json();
-      const supplier = data.data || data;
+      if (!data) {
+        throw new Error('Supplier not found');
+      }
       
       return {
         data: {
-          ...supplier,
-          address: [supplier.address_line_1, supplier.address_line_2, supplier.city, supplier.state]
+          ...data,
+          address: [data.address_line_1, data.address_line_2, data.city, data.state]
             .filter(Boolean)
             .join(', '),
-          createdAt: supplier.created_at,
-          updatedAt: supplier.updated_at
+          createdAt: data.created_at,
+          updatedAt: data.updated_at
         }
       };
     } catch (error) {
@@ -129,30 +119,36 @@ const supplierService = {
   // Create new supplier
   createSupplier: async (data: CreateSupplierRequest): Promise<SupplierResponse> => {
     try {
-      const response = await fetch(`${API_BASE_URL}/suppliers`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(data),
-      });
+      const supabase = createServerSupabaseClient();
+      const supplierData = {
+        ...data,
+        status: data.status || 'active',
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      };
       
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || `Failed to create supplier: ${response.statusText}`);
+      const { data: newSupplier, error } = await supabase
+        .from('suppliers')
+        .insert([supplierData])
+        .select()
+        .single();
+      
+      if (error) {
+        throw new Error(error.message);
       }
       
-      const responseData = await response.json();
-      const supplier = responseData.data || responseData;
+      if (!newSupplier) {
+        throw new Error('Failed to create supplier');
+      }
       
       return {
         data: {
-          ...supplier,
-          address: [supplier.address_line_1, supplier.address_line_2, supplier.city, supplier.state]
+          ...newSupplier,
+          address: [newSupplier.address_line_1, newSupplier.address_line_2, newSupplier.city, newSupplier.state]
             .filter(Boolean)
             .join(', '),
-          createdAt: supplier.created_at,
-          updatedAt: supplier.updated_at
+          createdAt: newSupplier.created_at,
+          updatedAt: newSupplier.updated_at
         }
       };
     } catch (error) {
@@ -164,30 +160,35 @@ const supplierService = {
   // Update existing supplier
   updateSupplier: async (id: string, data: UpdateSupplierRequest): Promise<SupplierResponse> => {
     try {
-      const response = await fetch(`${API_BASE_URL}/suppliers/${id}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(data),
-      });
+      const supabase = createServerSupabaseClient();
+      const updateData = {
+        ...data,
+        updated_at: new Date().toISOString()
+      };
       
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || `Failed to update supplier: ${response.statusText}`);
+      const { data: updatedSupplier, error } = await supabase
+        .from('suppliers')
+        .update(updateData)
+        .eq('id', id)
+        .select()
+        .single();
+      
+      if (error) {
+        throw new Error(error.message);
       }
       
-      const responseData = await response.json();
-      const supplier = responseData.data || responseData;
+      if (!updatedSupplier) {
+        throw new Error('Supplier not found');
+      }
       
       return {
         data: {
-          ...supplier,
-          address: [supplier.address_line_1, supplier.address_line_2, supplier.city, supplier.state]
+          ...updatedSupplier,
+          address: [updatedSupplier.address_line_1, updatedSupplier.address_line_2, updatedSupplier.city, updatedSupplier.state]
             .filter(Boolean)
             .join(', '),
-          createdAt: supplier.created_at,
-          updatedAt: supplier.updated_at
+          createdAt: updatedSupplier.created_at,
+          updatedAt: updatedSupplier.updated_at
         }
       };
     } catch (error) {
@@ -199,20 +200,19 @@ const supplierService = {
   // Delete supplier
   deleteSupplier: async (id: string): Promise<{ success: boolean; message: string }> => {
     try {
-      const response = await fetch(`${API_BASE_URL}/suppliers/${id}`, {
-        method: 'DELETE',
-      });
+      const supabase = createServerSupabaseClient();
+      const { error } = await supabase
+        .from('suppliers')
+        .delete()
+        .eq('id', id);
       
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || `Failed to delete supplier: ${response.statusText}`);
+      if (error) {
+        throw new Error(error.message);
       }
-      
-      const data = await response.json();
       
       return {
         success: true,
-        message: data.data?.message || 'Supplier deleted successfully'
+        message: 'Supplier deleted successfully'
       };
     } catch (error) {
       console.error('Error deleting supplier:', error);
@@ -222,46 +222,54 @@ const supplierService = {
 
   // Get supplier statistics
   getSupplierStats: async (): Promise<{ success: boolean; data: SupplierSummary }> => {
-    // Return mock stats immediately in development mode
-    if (isDevelopmentMode()) {
-      console.warn('🔧 Development mode: Supabase not configured, using mock stats');
-      return {
-        success: true,
-        data: {
-          total_suppliers: 2,
-          active_suppliers: 2,
-          inactive_suppliers: 0,
-          suspended_suppliers: 0,
-          pending_suppliers: 0,
-          total_orders: 0,
-          total_order_value: 0,
-          average_rating: 4.5,
-          suppliers_by_type: [
-            { type: 'manufacturer', count: 1 },
-            { type: 'distributor', count: 1 }
-          ],
-          suppliers_by_performance: [
-            { rating: 'excellent', count: 1 },
-            { rating: 'good', count: 1 }
-          ],
-          top_suppliers: [],
-          recent_suppliers: []
-        }
-      };
-    }
-    
     try {
-      const response = await fetch(`${API_BASE_URL}/suppliers/summary`);
-      
-      if (!response.ok) {
-        throw new Error(`Failed to fetch supplier stats: ${response.statusText}`);
+      const supabase = createServerSupabaseClient();
+      // Get total count of suppliers by status
+      const { data: suppliers, error } = await supabase
+        .from('suppliers')
+        .select('status, business_type, supplier_type, rating, created_at');
+        
+      if (error) {
+        throw new Error(error.message);
       }
       
-      const data = await response.json();
+      const stats = suppliers.reduce((acc, supplier) => {
+        acc.total_suppliers++;
+        
+        switch (supplier.status) {
+          case 'active':
+            acc.active_suppliers++;
+            break;
+          case 'inactive':
+            acc.inactive_suppliers++;
+            break;
+          case 'suspended':
+            acc.suspended_suppliers++;
+            break;
+          case 'pending':
+            acc.pending_suppliers++;
+            break;
+        }
+        
+        return acc;
+      }, {
+        total_suppliers: 0,
+        active_suppliers: 0,
+        inactive_suppliers: 0,
+        suspended_suppliers: 0,
+        pending_suppliers: 0,
+        total_orders: 0,
+        total_order_value: 0,
+        average_rating: 0,
+        suppliers_by_type: [],
+        suppliers_by_performance: [],
+        top_suppliers: [],
+        recent_suppliers: []
+      });
       
       return {
         success: true,
-        data: data.data || data
+        data: stats
       };
     } catch (error) {
       console.error('Error fetching supplier stats:', error);

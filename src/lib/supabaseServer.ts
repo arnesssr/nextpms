@@ -8,7 +8,7 @@ const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 export const createServerSupabaseClient = () => {
   if (!supabaseUrl || !supabaseServiceRoleKey) {
     throw new Error(
-      'Missing Supabase environment variables for server client. Please ensure REACT_APP_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are set.'
+      'Missing Supabase environment variables for server client. Please ensure NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are set.'
     );
   }
 
@@ -16,6 +16,14 @@ export const createServerSupabaseClient = () => {
     auth: {
       autoRefreshToken: false,
       persistSession: false
+    },
+    db: {
+      schema: 'public'
+    },
+    global: {
+      headers: {
+        'X-Client-Info': 'supabase-js-server'
+      }
     }
   });
 };

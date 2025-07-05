@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -33,11 +33,13 @@ import { Supplier } from '../types/suppliers.types';
 import { CreateSupplierModal } from './CreateSupplierModal';
 import { EditSupplierModal } from './EditSupplierModal';
 import { DeleteSupplierModal } from './DeleteSupplierModal';
+import { ViewSupplierModal } from './ViewSupplierModal';
 
 export function SuppliersList() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [editingSupplier, setEditingSupplier] = useState<Supplier | null>(null);
   const [deletingSupplier, setDeletingSupplier] = useState<Supplier | null>(null);
+  const [viewingSupplier, setViewingSupplier] = useState<Supplier | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
 
   const { 
@@ -45,8 +47,10 @@ export function SuppliersList() {
     stats, 
     loading, 
     error, 
-    fetchSuppliers 
+    fetchSuppliers,
+    createSupplier
   } = useSuppliers();
+  
 
   // Handle search
   const handleSearch = (term: string) => {
@@ -252,7 +256,7 @@ export function SuppliersList() {
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                          <DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => setViewingSupplier(supplier)}>
                             <Eye className="w-4 h-4 mr-2" />
                             View Details
                           </DropdownMenuItem>
@@ -297,6 +301,18 @@ export function SuppliersList() {
           supplier={deletingSupplier}
           open={!!deletingSupplier}
           onClose={() => setDeletingSupplier(null)}
+        />
+      )}
+      
+      {viewingSupplier && (
+        <ViewSupplierModal 
+          supplier={viewingSupplier}
+          open={!!viewingSupplier}
+          onClose={() => setViewingSupplier(null)}
+          onEdit={() => {
+            setEditingSupplier(viewingSupplier);
+            setViewingSupplier(null);
+          }}
         />
       )}
     </div>
