@@ -135,3 +135,6 @@ export interface InventoryMetrics {
   totalValue: number;
   turnoverRate: number;
 }
+
+// Re-export order types
+export * from './orders';
