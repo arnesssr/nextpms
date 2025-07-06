@@ -41,7 +41,8 @@ import {
   AlertTriangle,
   CheckCircle2,
   XCircle,
-  Clock
+  Clock,
+  BarChart3
 } from 'lucide-react';
 import { Product } from '../types';
 import { useProductCatalog } from '../hooks/useProductCatalog';
@@ -72,6 +73,7 @@ export function ProductCatalogList({
   // Product detail modal state
   const [selectedProductId, setSelectedProductId] = useState<string | null>(null);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
+  
 
   // Get unique categories for filter dropdown
   const categories = useMemo(() => {
@@ -79,9 +81,25 @@ export function ProductCatalogList({
     return uniqueCategories;
   }, [products]);
 
+  // Use products with their embedded stock data
+  const enrichedProducts = useMemo(() => {
+    return products.map(product => {
+      return {
+        ...product,
+        current_stock: product.current_stock || product.stock_quantity || 0,
+        reserved_quantity: 0, // No reserved quantity tracking in products
+        available_stock: product.current_stock || product.stock_quantity || 0,
+        low_stock_threshold: product.min_stock_level || 10,
+        location: 'Main Warehouse', // Default location
+        last_updated: product.updated_at
+      };
+    });
+  }, [products]);
+
+
   // Filter and sort products
   const filteredAndSortedProducts = useMemo(() => {
-    let filtered = products.filter(product => {
+    let filtered = enrichedProducts.filter(product => {
       const matchesSearch = product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
                            product.sku.toLowerCase().includes(searchTerm.toLowerCase()) ||
                            (product.description && product.description.toLowerCase().includes(searchTerm.toLowerCase()));
@@ -128,7 +146,7 @@ export function ProductCatalogList({
     });
 
     return filtered;
-  }, [products, searchTerm, statusFilter, categoryFilter, sortBy, sortOrder]);
+  }, [enrichedProducts, searchTerm, statusFilter, categoryFilter, sortBy, sortOrder]);
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -177,27 +195,53 @@ export function ProductCatalogList({
     }
   };
 
-  const getStockStatus = (currentStock: number, minStock: number = 10) => {
-    if (currentStock === 0) {
+  const getStockStatus = (product: any) => {
+    const currentStock = product.current_stock || 0;
+    const reservedStock = product.reserved_quantity || 0;
+    const availableStock = currentStock - reservedStock;
+    const minStock = product.low_stock_threshold || 10;
+    
+    if (availableStock <= 0) {
       return (
-        <Badge variant="destructive" className="bg-red-100 text-red-800 border-red-200">
-          <XCircle className="w-3 h-3 mr-1" />
-          Out of Stock
-        </Badge>
+        <div className="space-y-1">
+          <Badge variant="destructive" className="bg-red-100 text-red-800 border-red-200">
+            <XCircle className="w-3 h-3 mr-1" />
+            {currentStock === 0 ? 'Out of Stock' : 'No Available'}
+          </Badge>
+          {reservedStock > 0 && (
+            <div className="text-xs text-muted-foreground">
+              {reservedStock} reserved
+            </div>
+          )}
+        </div>
       );
-    } else if (currentStock <= minStock) {
+    } else if (availableStock <= minStock) {
       return (
-        <Badge variant="outline" className="bg-orange-100 text-orange-800 border-orange-200">
-          <AlertTriangle className="w-3 h-3 mr-1" />
-          Low Stock
-        </Badge>
+        <div className="space-y-1">
+          <Badge variant="outline" className="bg-orange-100 text-orange-800 border-orange-200">
+            <AlertTriangle className="w-3 h-3 mr-1" />
+            Low Stock
+          </Badge>
+          {reservedStock > 0 && (
+            <div className="text-xs text-muted-foreground">
+              {reservedStock} reserved
+            </div>
+          )}
+        </div>
       );
     } else {
       return (
-        <Badge variant="outline" className="bg-green-100 text-green-800 border-green-200">
-          <CheckCircle2 className="w-3 h-3 mr-1" />
-          In Stock
-        </Badge>
+        <div className="space-y-1">
+          <Badge variant="outline" className="bg-green-100 text-green-800 border-green-200">
+            <CheckCircle2 className="w-3 h-3 mr-1" />
+            In Stock
+          </Badge>
+          {reservedStock > 0 && (
+            <div className="text-xs text-muted-foreground">
+              {reservedStock} reserved
+            </div>
+          )}
+        </div>
       );
     }
   };
@@ -210,6 +254,7 @@ export function ProductCatalogList({
       setSortOrder('asc');
     }
   };
+
 
   if (loading) {
     return (
@@ -342,6 +387,7 @@ export function ProductCatalogList({
         </CardContent>
       </Card>
 
+
       {/* Products Table */}
       <Card>
         <CardContent className="p-0">
@@ -406,6 +452,7 @@ export function ProductCatalogList({
                     )}
                   </TableHead>
                   <TableHead>Status</TableHead>
+                  <TableHead>Available</TableHead>
                   <TableHead>Stock Status</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
@@ -436,13 +483,28 @@ export function ProductCatalogList({
                       </div>
                     </TableCell>
                     <TableCell>
+                      <div className="space-y-1">
+                        <div className="flex items-center">
+                          <Package className="h-3 w-3 mr-1" />
+                          <span className="font-mono text-sm">{product.current_stock}</span>
+                        </div>
+                        {product.reserved_quantity > 0 && (
+                          <div className="text-xs text-muted-foreground">
+                            {product.reserved_quantity} reserved
+                          </div>
+                        )}
+                      </div>
+                    </TableCell>
+                    <TableCell>
                       <div className="flex items-center">
-                        <Package className="h-3 w-3 mr-1" />
-                        {product.current_stock}
+                        <span className="font-mono text-sm font-medium text-green-600">
+                          {product.available_stock}
+                        </span>
+                        <span className="text-xs text-muted-foreground ml-1">avail</span>
                       </div>
                     </TableCell>
                     <TableCell>{getStatusBadge(product.status)}</TableCell>
-                    <TableCell>{getStockStatus(product.current_stock)}</TableCell>
+                    <TableCell>{getStockStatus(product)}</TableCell>
                     <TableCell className="text-right">
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
@@ -517,6 +579,7 @@ export function ProductCatalogList({
           refreshProducts();
         }}
       />
+
     </div>
   );
 }

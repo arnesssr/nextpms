@@ -115,7 +115,7 @@ const IntegrationSettingsForm: React.FC = () => {
             <div className="flex space-x-2">
               <Input
                 id="webhook-url"
-                value="https://example.com/api/webhooks"
+                defaultValue="https://example.com/api/webhooks"
                 className="font-mono"
               />
               <Button variant="outline" size="icon">

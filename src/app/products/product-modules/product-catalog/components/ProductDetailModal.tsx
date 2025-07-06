@@ -235,9 +235,17 @@ export function ProductDetailModal({
                   </CardHeader>
                   <CardContent className="space-y-2">
                     <div>
-                      <p className="text-xs text-muted-foreground">Stock</p>
+                      <p className="text-xs text-muted-foreground">Current Stock</p>
                       <p className="text-lg font-bold">{product.stock_quantity || 0}</p>
                     </div>
+                    
+                    {product.min_stock_level && (
+                      <div>
+                        <p className="text-xs text-muted-foreground">Low Stock Alert</p>
+                        <p className="text-sm">{product.min_stock_level} units</p>
+                      </div>
+                    )}
+                    
                     <div className="mt-2">
                       {getStockStatus(product.stock_quantity || 0, product.min_stock_level || 0)}
                     </div>

@@ -14,7 +14,6 @@ import {
 
 // Import module components
 import { ProductList } from '../product-modules/product-list/components/ProductList';
-import { InventoryDashboard } from '../product-modules/inventory-management/components/InventoryDashboard';
 import { PricingDashboard } from '../product-modules/pricing-management/components/PricingDashboard';
 import { ProductCatalogList } from '../product-modules/product-catalog/components/ProductCatalogList';
 import { Product } from '../product-modules/product-catalog/types';
@@ -33,12 +32,6 @@ const productModules = [
     label: 'Product Catalog',
     icon: Package,
     description: 'Browse and manage your complete product catalog'
-  },
-  {
-    id: 'inventory',
-    label: 'Inventory',
-    icon: Archive,
-    description: 'Monitor stock levels and manage inventory'
   },
   {
     id: 'pricing',
@@ -76,9 +69,6 @@ export const ProductModuleTabs: React.FC<ProductModuleTabsProps> = ({
           />
         );
       
-      case 'inventory':
-        return <InventoryDashboard showFilters={true} />;
-      
       case 'pricing':
         return <PricingDashboard showProductSelection={true} />;
       
@@ -105,7 +95,7 @@ export const ProductModuleTabs: React.FC<ProductModuleTabsProps> = ({
   return (
     <div className="space-y-6">
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-4 lg:w-auto lg:grid-cols-4 gap-1 h-auto p-1">
+        <TabsList className="grid w-full grid-cols-3 lg:w-auto lg:grid-cols-3 gap-1 h-auto p-1">
           {productModules.map((module) => {
             const IconComponent = module.icon;
             return (

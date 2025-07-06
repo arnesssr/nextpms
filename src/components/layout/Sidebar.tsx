@@ -28,17 +28,16 @@ import {
   Search,
 } from 'lucide-react';
 import {
-  PmsLogo,
-  DashboardIcon,
-  ProductsIcon,
-  CategoriesIcon,
-  OrdersIcon,
-  InventoryIcon,
-  SuppliersIcon,
-  AnalyticsIcon,
-  SettingsIcon,
-  ProfileIcon,
-} from '@/components/icons';
+  Squares2X2Icon as DashboardIcon,
+  CubeIcon as ProductsIcon,
+  ShoppingBagIcon as OrdersIcon,
+  BuildingStorefrontIcon as InventoryIcon,
+  TruckIcon as SuppliersIcon,
+  ChartBarIcon as AnalyticsIcon,
+  Cog6ToothIcon as SettingsIcon,
+  UserIcon as ProfileIcon,
+  TagIcon as CategoriesIcon,
+} from '@heroicons/react/24/outline';
 
 interface SidebarLayoutProps {
   children: ReactNode;
@@ -47,9 +46,8 @@ interface SidebarLayoutProps {
 const navigationItems = [
   { icon: DashboardIcon, label: 'Dashboard', href: '/' },
   { icon: ProductsIcon, label: 'Products', href: '/products' },
-  { icon: CategoriesIcon, label: 'Categories', href: '/categories' },
-  { icon: OrdersIcon, label: 'Orders', href: '/orders' },
   { icon: InventoryIcon, label: 'Inventory', href: '/inventory' },
+  { icon: OrdersIcon, label: 'Orders', href: '/orders' },
   { icon: SuppliersIcon, label: 'Suppliers', href: '/suppliers' },
   { icon: AnalyticsIcon, label: 'Analytics', href: '/analytics' },
   { icon: SettingsIcon, label: 'Settings', href: '/settings' },
@@ -79,7 +77,7 @@ function AppSidebar() {
                   <SidebarMenuItem key={item.label}>
                     <SidebarMenuButton asChild isActive={isActive}>
                       <Link href={item.href}>
-                        <Icon className="h-4 w-4" />
+                        <Icon className="h-10 w-10" />
                         <span>{item.label}</span>
                       </Link>
                     </SidebarMenuButton>

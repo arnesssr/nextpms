@@ -16,8 +16,8 @@ export const useOrders = () => {
 
   const fetchOrders = useCallback(async (
     currentFilters: OrderFilters = filters,
-    page: number = pagination.page,
-    limit: number = pagination.limit
+    page: number = 1,
+    limit: number = 10
   ) => {
     try {
       setLoading(true);
@@ -46,15 +46,19 @@ export const useOrders = () => {
 
       const result: PaginatedResponse<Order> = await response.json();
       
-      setOrders(result.data);
-      setPagination(result.pagination);
+      if (result.success) {
+        setOrders(result.data);
+        setPagination(result.pagination);
+      } else {
+        throw new Error(result.message || 'Failed to fetch orders');
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred');
       setOrders([]);
     } finally {
       setLoading(false);
     }
-  }, [filters, pagination.page, pagination.limit]);
+  }, [filters]);
 
   const fetchStats = useCallback(async () => {
     try {
@@ -92,7 +96,7 @@ export const useOrders = () => {
       
       if (result.success) {
         // Refresh orders list
-        await fetchOrders();
+        await fetchOrders(filters, pagination.page, pagination.limit);
         return result.data;
       } else {
         throw new Error(result.message || 'Failed to update order');
@@ -100,7 +104,7 @@ export const useOrders = () => {
     } catch (err) {
       throw err;
     }
-  }, [fetchOrders]);
+  }, [fetchOrders, filters, pagination.page, pagination.limit]);
 
   const deleteOrder = useCallback(async (orderId: string) => {
     try {
@@ -116,7 +120,7 @@ export const useOrders = () => {
       
       if (result.success) {
         // Refresh orders list
-        await fetchOrders();
+        await fetchOrders(filters, pagination.page, pagination.limit);
         return true;
       } else {
         throw new Error(result.message || 'Failed to delete order');
@@ -124,18 +128,18 @@ export const useOrders = () => {
     } catch (err) {
       throw err;
     }
-  }, [fetchOrders]);
+  }, [fetchOrders, filters, pagination.page, pagination.limit]);
 
   const applyFilters = useCallback((newFilters: OrderFilters) => {
     setFilters(newFilters);
     setPagination(prev => ({ ...prev, page: 1 }));
-    fetchOrders(newFilters, 1);
-  }, [fetchOrders]);
+    fetchOrders(newFilters, 1, pagination.limit);
+  }, [fetchOrders, pagination.limit]);
 
   const changePage = useCallback((page: number) => {
     setPagination(prev => ({ ...prev, page }));
-    fetchOrders(filters, page);
-  }, [fetchOrders, filters]);
+    fetchOrders(filters, page, pagination.limit);
+  }, [fetchOrders, filters, pagination.limit]);
 
   const changeLimit = useCallback((limit: number) => {
     setPagination(prev => ({ ...prev, limit, page: 1 }));
@@ -143,15 +147,15 @@ export const useOrders = () => {
   }, [fetchOrders, filters]);
 
   const refreshOrders = useCallback(() => {
-    fetchOrders();
+    fetchOrders(filters, pagination.page, pagination.limit);
     fetchStats();
-  }, [fetchOrders, fetchStats]);
+  }, [fetchOrders, fetchStats, filters, pagination.page, pagination.limit]);
 
   // Initial load
   useEffect(() => {
-    fetchOrders();
+    fetchOrders(filters, pagination.page, pagination.limit);
     fetchStats();
-  }, []);
+  }, []); // Empty dependency array for initial load only
 
   return {
     orders,
