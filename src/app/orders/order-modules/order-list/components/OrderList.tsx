@@ -7,6 +7,20 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
+import {
+  Table as TableComponent,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { 
   Search, 
   Filter, 
@@ -14,8 +28,14 @@ import {
   RefreshCw,
   Grid,
   List,
+  Table,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  Eye,
+  Edit,
+  Package,
+  Trash2,
+  MoreHorizontal
 } from 'lucide-react';
 
 import { OrderCard } from './OrderCard';
@@ -47,7 +67,7 @@ export const OrderList: React.FC<OrderListProps> = ({
   } = useOrders();
 
   const [showFilters, setShowFilters] = useState(false);
-  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+  const [viewMode, setViewMode] = useState<'grid' | 'list' | 'table'>('grid');
   const [searchTerm, setSearchTerm] = useState('');
 
   const handleSearch = () => {
@@ -140,7 +160,7 @@ export const OrderList: React.FC<OrderListProps> = ({
                   variant={viewMode === 'grid' ? 'default' : 'ghost'}
                   size="sm"
                   onClick={() => setViewMode('grid')}
-                  className="rounded-r-none"
+                  className="rounded-r-none border-r"
                 >
                   <Grid className="h-4 w-4" />
                 </Button>
@@ -148,9 +168,17 @@ export const OrderList: React.FC<OrderListProps> = ({
                   variant={viewMode === 'list' ? 'default' : 'ghost'}
                   size="sm"
                   onClick={() => setViewMode('list')}
-                  className="rounded-l-none"
+                  className="rounded-none border-r"
                 >
                   <List className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant={viewMode === 'table' ? 'default' : 'ghost'}
+                  size="sm"
+                  onClick={() => setViewMode('table')}
+                  className="rounded-l-none"
+                >
+                  <Table className="h-4 w-4" />
                 </Button>
               </div>
             </div>
@@ -249,19 +277,105 @@ export const OrderList: React.FC<OrderListProps> = ({
             </Card>
           ) : (
             <>
-              {/* Orders Grid/List */}
-              <div className={`grid gap-4 ${viewMode === 'grid' ? 'md:grid-cols-2 xl:grid-cols-3' : 'grid-cols-1'}`}>
-                {orders.map((order) => (
-                  <OrderCard
-                    key={order.id}
-                    order={order}
-                    onEdit={handleEdit}
-                    onView={handleView}
-                    onDelete={handleDelete}
-                    onFulfill={handleFulfill}
-                  />
-                ))}
-              </div>
+              {/* Orders Grid/List/Table */}
+              {viewMode === 'table' ? (
+                <Card>
+                  <CardContent className="p-0">
+                    <TableComponent>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Order #</TableHead>
+                          <TableHead>Customer</TableHead>
+                          <TableHead>Status</TableHead>
+                          <TableHead>Total</TableHead>
+                          <TableHead>Items</TableHead>
+                          <TableHead>Date</TableHead>
+                          <TableHead className="w-[70px]">Actions</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {orders.map((order) => {
+                          const formattedOrder = OrderListService.formatOrderForDisplay(order);
+                          const canFulfill = order.status === 'confirmed' || order.status === 'processing';
+                          
+                          return (
+                            <TableRow key={order.id}>
+                              <TableCell>
+                                <div className="font-medium">#{order.order_number || order.id}</div>
+                              </TableCell>
+                              <TableCell>
+                                <div className="max-w-[150px] truncate">
+                                  {order.shipping_name || order.customer_id || 'Unknown'}
+                                </div>
+                              </TableCell>
+                              <TableCell>
+                                <Badge className={formattedOrder.statusColor} variant="secondary">
+                                  {order.status}
+                                </Badge>
+                              </TableCell>
+                              <TableCell className="font-medium">
+                                {formattedOrder.formattedTotal}
+                              </TableCell>
+                              <TableCell>
+                                {order.items?.length || 0}
+                              </TableCell>
+                              <TableCell className="text-muted-foreground">
+                                {formattedOrder.formattedDate}
+                              </TableCell>
+                              <TableCell>
+                                <DropdownMenu>
+                                  <DropdownMenuTrigger asChild>
+                                    <Button variant="ghost" size="sm">
+                                      <MoreHorizontal className="h-4 w-4" />
+                                    </Button>
+                                  </DropdownMenuTrigger>
+                                  <DropdownMenuContent align="end">
+                                    <DropdownMenuItem onClick={() => handleView(order)}>
+                                      <Eye className="mr-2 h-4 w-4" />
+                                      View
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem onClick={() => handleEdit(order)}>
+                                      <Edit className="mr-2 h-4 w-4" />
+                                      Edit
+                                    </DropdownMenuItem>
+                                    {canFulfill && (
+                                      <DropdownMenuItem onClick={() => handleFulfill(order)}>
+                                        <Package className="mr-2 h-4 w-4" />
+                                        Fulfill
+                                      </DropdownMenuItem>
+                                    )}
+                                    <DropdownMenuItem 
+                                      onClick={() => handleDelete(order.id)}
+                                      className="text-red-600 focus:text-red-600"
+                                    >
+                                      <Trash2 className="mr-2 h-4 w-4" />
+                                      Delete
+                                    </DropdownMenuItem>
+                                  </DropdownMenuContent>
+                                </DropdownMenu>
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })}
+                      </TableBody>
+                    </TableComponent>
+                  </CardContent>
+                </Card>
+              ) : (
+                <div className={`grid gap-4 ${viewMode === 'grid' ? 'md:grid-cols-2 xl:grid-cols-3' : 'grid-cols-1'}`}>
+                  {orders.map((order) => (
+                    <OrderCard
+                      key={order.id}
+                      order={order}
+                      viewMode="compact"
+                      onEdit={handleEdit}
+                      onView={handleView}
+                      onDelete={handleDelete}
+                      onFulfill={handleFulfill}
+                    />
+                  ))}
+                </div>
+              )}
 
               {/* Pagination */}
               {pagination.totalPages > 1 && (

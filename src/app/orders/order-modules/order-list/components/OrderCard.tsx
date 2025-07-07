@@ -23,12 +23,17 @@ import {
 import { OrderCardProps } from '../types';
 import { OrderListService } from '../services';
 
-export const OrderCard: React.FC<OrderCardProps> = ({
+interface ExtendedOrderCardProps extends OrderCardProps {
+  viewMode?: 'compact' | 'expanded';
+}
+
+export const OrderCard: React.FC<ExtendedOrderCardProps> = ({
   order,
   onEdit,
   onView,
   onDelete,
-  onFulfill
+  onFulfill,
+  viewMode = 'compact'
 }) => {
   const formattedOrder = OrderListService.formatOrderForDisplay(order);
 
@@ -52,6 +57,91 @@ export const OrderCard: React.FC<OrderCardProps> = ({
 
   const canFulfill = order.status === 'confirmed' || order.status === 'processing';
 
+  if (viewMode === 'compact') {
+    return (
+      <Card className="hover:shadow-sm transition-shadow">
+        <CardContent className="p-4">
+          {/* Header Row */}
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center space-x-2">
+              <h3 className="font-semibold text-base">#{order.order_number || order.id}</h3>
+              <Badge className={formattedOrder.statusColor} variant="secondary">
+                {order.status}
+              </Badge>
+            </div>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="sm">
+                  <MoreHorizontal className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={handleView}>
+                  <Eye className="mr-2 h-4 w-4" />
+                  View
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={handleEdit}>
+                  <Edit className="mr-2 h-4 w-4" />
+                  Edit
+                </DropdownMenuItem>
+                {canFulfill && (
+                  <DropdownMenuItem onClick={handleFulfill}>
+                    <Package className="mr-2 h-4 w-4" />
+                    Fulfill
+                  </DropdownMenuItem>
+                )}
+                <DropdownMenuItem 
+                  onClick={handleDelete}
+                  className="text-red-600 focus:text-red-600"
+                >
+                  <Trash2 className="mr-2 h-4 w-4" />
+                  Delete
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+          
+          {/* Compact Info Grid */}
+          <div className="grid grid-cols-2 gap-3 text-sm">
+            <div className="flex items-center space-x-1">
+              <User className="h-3 w-3 text-muted-foreground" />
+              <span className="text-muted-foreground truncate">
+                {order.shipping_name || order.customer_id || 'Unknown'}
+              </span>
+            </div>
+            <div className="flex items-center space-x-1">
+              <DollarSign className="h-3 w-3 text-muted-foreground" />
+              <span className="font-medium">{formattedOrder.formattedTotal}</span>
+            </div>
+            <div className="flex items-center space-x-1">
+              <Package className="h-3 w-3 text-muted-foreground" />
+              <span className="text-muted-foreground">{order.items?.length || 0} items</span>
+            </div>
+            <div className="flex items-center space-x-1">
+              <Calendar className="h-3 w-3 text-muted-foreground" />
+              <span className="text-muted-foreground">{formattedOrder.formattedDate}</span>
+            </div>
+          </div>
+          
+          {/* Quick Action Buttons */}
+          <div className="flex space-x-2 mt-3">
+            <Button variant="outline" size="sm" onClick={handleView} className="flex-1">
+              <Eye className="mr-1 h-3 w-3" />
+              View
+            </Button>
+            {canFulfill && (
+              <Button size="sm" onClick={handleFulfill} className="flex-1">
+                <Package className="mr-1 h-3 w-3" />
+                Fulfill
+              </Button>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  // Expanded view (original layout)
   return (
     <Card className="hover:shadow-md transition-shadow">
       <CardHeader className="pb-3">
