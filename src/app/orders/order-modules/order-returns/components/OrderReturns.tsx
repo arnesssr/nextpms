@@ -88,7 +88,7 @@ export const OrderReturns: React.FC = () => {
         })) || [],
         status: 'pending' as const,
         reason: returnReason,
-        refund_amount: parseFloat(refundAmount) || selectedOrder.total,
+        refund_amount: parseFloat(refundAmount) || selectedOrder.total_amount || selectedOrder.total || 0,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
       };
@@ -176,7 +176,7 @@ export const OrderReturns: React.FC = () => {
               <Select onValueChange={(value) => {
                 const order = orders.find(o => o.id === value);
                 setSelectedOrder(order || null);
-                setRefundAmount(order?.total.toString() || '');
+                setRefundAmount((order?.total_amount || order?.total || 0).toString());
               }}>
                 <SelectTrigger>
                   <SelectValue placeholder="Choose an order" />
@@ -184,7 +184,7 @@ export const OrderReturns: React.FC = () => {
                 <SelectContent>
                   {orders.map((order) => (
                     <SelectItem key={order.id} value={order.id}>
-                      #{order.id} - {order.customerId} - ${order.total.toFixed(2)}
+                      #{order.order_number || order.id} - {order.shipping_name || order.customerId || order.customer_id || 'Unknown'} - ${(order.total_amount || order.total || 0).toFixed(2)}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -195,12 +195,12 @@ export const OrderReturns: React.FC = () => {
               <>
                 {/* Order Details */}
                 <div className="p-4 bg-muted rounded-lg">
-                  <h4 className="font-medium mb-2">#{selectedOrder.id}</h4>
+                  <h4 className="font-medium mb-2">#{selectedOrder.order_number || selectedOrder.id}</h4>
                   <p className="text-sm text-muted-foreground">
-                    Customer: {selectedOrder.customerId}
+                    Customer: {selectedOrder.shipping_name || selectedOrder.customerId || selectedOrder.customer_id || 'Unknown'}
                   </p>
                   <p className="text-sm text-muted-foreground">
-                    Total: ${selectedOrder.total.toFixed(2)}
+                    Total: ${(selectedOrder.total_amount || selectedOrder.total || 0).toFixed(2)}
                   </p>
                   <p className="text-sm text-muted-foreground">
                     Items: {selectedOrder.items?.length || 0}
@@ -293,16 +293,16 @@ export const OrderReturns: React.FC = () => {
                     
                     <div className="space-y-2 text-sm">
                       <p>
-                        <span className="font-medium">Order:</span> #{returnRequest.order?.id}
+                        <span className="font-medium">Order:</span> #{returnRequest.order?.order_number || returnRequest.order?.id}
                       </p>
                       <p>
-                        <span className="font-medium">Customer:</span> {returnRequest.order?.customerId}
+                        <span className="font-medium">Customer:</span> {returnRequest.order?.shipping_name || returnRequest.order?.customerId || returnRequest.order?.customer_id || 'Unknown'}
                       </p>
                       <p>
                         <span className="font-medium">Reason:</span> {returnRequest.reason}
                       </p>
                       <p>
-                        <span className="font-medium">Refund Amount:</span> ${returnRequest.refund_amount.toFixed(2)}
+                        <span className="font-medium">Refund Amount:</span> ${(returnRequest.refund_amount || 0).toFixed(2)}
                       </p>
                       <p>
                         <span className="font-medium">Created:</span> {new Date(returnRequest.created_at).toLocaleDateString()}
