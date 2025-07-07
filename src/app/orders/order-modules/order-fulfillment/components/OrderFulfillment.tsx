@@ -137,16 +137,16 @@ export const OrderFulfillment: React.FC<OrderFulfillmentProps> = ({ onOrderFulfi
                     onClick={() => setSelectedOrder(order)}
                   >
                     <div className="flex items-center justify-between mb-2">
-                      <h4 className="font-medium">#{order.id}</h4>
+                      <h4 className="font-medium">#{order.order_number || order.id}</h4>
                       <Badge className={getStatusColor(order.status)}>
                         {order.status}
                       </Badge>
                     </div>
                     <p className="text-sm text-muted-foreground">
-                      Customer: {order.customerId}
+                      Customer: {order.shipping_name || order.customer_id || 'Unknown'}
                     </p>
                     <p className="text-sm text-muted-foreground">
-                      Total: ${order.total.toFixed(2)}
+                      Total: ${(order.total_amount || order.total || 0).toFixed(2)}
                     </p>
                     <p className="text-sm text-muted-foreground">
                       Items: {order.items?.length || 0}
@@ -168,15 +168,15 @@ export const OrderFulfillment: React.FC<OrderFulfillmentProps> = ({ onOrderFulfi
               <div className="space-y-4">
                 {/* Order Details */}
                 <div className="p-4 bg-muted rounded-lg">
-                  <h4 className="font-medium mb-2">#{selectedOrder.id}</h4>
+                  <h4 className="font-medium mb-2">#{selectedOrder.order_number || selectedOrder.id}</h4>
                   <p className="text-sm text-muted-foreground">
-                    Customer: {selectedOrder.customerId}
+                    Customer: {selectedOrder.shipping_name || selectedOrder.customer_id || 'Unknown'}
                   </p>
                   <p className="text-sm text-muted-foreground">
-                    Total: ${selectedOrder.total.toFixed(2)}
+                    Total: ${(selectedOrder.total_amount || selectedOrder.total || 0).toFixed(2)}
                   </p>
                   <p className="text-sm text-muted-foreground">
-                    Shipping to: {selectedOrder.shippingAddress}
+                    Shipping to: {selectedOrder.shipping_address_line_1 || selectedOrder.shippingAddress || 'No address'}
                   </p>
                 </div>
 
@@ -186,7 +186,7 @@ export const OrderFulfillment: React.FC<OrderFulfillmentProps> = ({ onOrderFulfi
                   <div className="mt-2 space-y-2">
                     {selectedOrder.items?.map((item, index) => (
                       <div key={index} className="flex justify-between text-sm p-2 bg-muted rounded">
-                        <span>Product {item.productId}</span>
+                        <span>{item.product_name || `Product ${item.product_id || item.productId}`}</span>
                         <span>Qty: {item.quantity}</span>
                       </div>
                     ))}

@@ -57,7 +57,7 @@ export const OrderCard: React.FC<OrderCardProps> = ({
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-2">
-            <h3 className="font-semibold text-lg">#{order.id}</h3>
+            <h3 className="font-semibold text-lg">#{order.order_number || order.id}</h3>
             <Badge className={formattedOrder.statusColor}>
               {order.status}
             </Badge>
@@ -99,7 +99,7 @@ export const OrderCard: React.FC<OrderCardProps> = ({
         {/* Customer Info */}
         <div className="flex items-center space-x-2 text-sm text-muted-foreground">
           <User className="h-4 w-4" />
-          <span>Customer: {order.customerId}</span>
+          <span>Customer: {order.shipping_name || order.customer_id || 'Unknown'}</span>
         </div>
 
         {/* Order Details */}
@@ -123,7 +123,12 @@ export const OrderCard: React.FC<OrderCardProps> = ({
         {/* Shipping Address */}
         <div className="text-sm text-muted-foreground">
           <p className="font-medium">Shipping to:</p>
-          <p className="truncate">{order.shippingAddress}</p>
+          <p className="truncate">
+            {order.shipping_name && (
+              <span>{order.shipping_name}<br /></span>
+            )}
+            {order.shipping_address_line_1 || order.shippingAddress || 'No address provided'}
+          </p>
         </div>
 
         {/* Action Buttons */}

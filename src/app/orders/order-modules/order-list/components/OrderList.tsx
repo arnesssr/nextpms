@@ -20,7 +20,6 @@ import {
 
 import { OrderCard } from './OrderCard';
 import { OrderFilters } from './OrderFilters';
-import { OrderStats } from './OrderStats';
 import { useOrders } from '../hooks';
 import { OrderListService } from '../services';
 import { OrderListProps } from '../types';
@@ -39,7 +38,6 @@ export const OrderList: React.FC<OrderListProps> = ({
     error,
     pagination,
     filters,
-    stats,
     applyFilters,
     changePage,
     changeLimit,
@@ -114,9 +112,6 @@ export const OrderList: React.FC<OrderListProps> = ({
 
   return (
     <div className="space-y-6">
-      {/* Stats Section */}
-      {stats && <OrderStats stats={stats} />}
-
       {/* Controls */}
       <Card>
         <CardHeader>

@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Order, OrderFilters, OrderStats, PaginatedResponse } from '@/types';
+import { Order, OrderFilters, PaginatedResponse } from '@/types';
 
 export const useOrders = () => {
   const [orders, setOrders] = useState<Order[]>([]);
@@ -12,7 +12,6 @@ export const useOrders = () => {
     totalPages: 0
   });
   const [filters, setFilters] = useState<OrderFilters>({});
-  const [stats, setStats] = useState<OrderStats | null>(null);
 
   const fetchOrders = useCallback(async (
     currentFilters: OrderFilters = filters,
@@ -60,23 +59,6 @@ export const useOrders = () => {
     }
   }, [filters]);
 
-  const fetchStats = useCallback(async () => {
-    try {
-      const response = await fetch('/api/orders/stats');
-      
-      if (!response.ok) {
-        throw new Error('Failed to fetch order stats');
-      }
-
-      const result = await response.json();
-      
-      if (result.success) {
-        setStats(result.data);
-      }
-    } catch (err) {
-      console.error('Error fetching order stats:', err);
-    }
-  }, []);
 
   const updateOrder = useCallback(async (orderId: string, updates: any) => {
     try {
@@ -148,13 +130,11 @@ export const useOrders = () => {
 
   const refreshOrders = useCallback(() => {
     fetchOrders(filters, pagination.page, pagination.limit);
-    fetchStats();
-  }, [fetchOrders, fetchStats, filters, pagination.page, pagination.limit]);
+  }, [fetchOrders, filters, pagination.page, pagination.limit]);
 
   // Initial load
   useEffect(() => {
     fetchOrders(filters, pagination.page, pagination.limit);
-    fetchStats();
   }, []); // Empty dependency array for initial load only
 
   return {
@@ -163,7 +143,6 @@ export const useOrders = () => {
     error,
     pagination,
     filters,
-    stats,
     fetchOrders,
     updateOrder,
     deleteOrder,

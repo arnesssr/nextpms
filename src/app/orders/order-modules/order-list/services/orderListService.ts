@@ -14,8 +14,8 @@ export class OrderListService {
       formattedTotal: new Intl.NumberFormat('en-US', {
         style: 'currency',
         currency: 'USD'
-      }).format(order.total),
-      formattedDate: new Date(order.createdAt).toLocaleDateString('en-US', {
+      }).format(order.total_amount || order.total || 0),
+      formattedDate: new Date(order.created_at || order.createdAt).toLocaleDateString('en-US', {
         year: 'numeric',
         month: 'short',
         day: 'numeric',
@@ -72,13 +72,13 @@ export class OrderListService {
     ];
 
     const rows = orders.map(order => [
-      order.id,
-      order.customerId,
+      order.order_number || order.id,
+      order.customer?.name || order.customer_id || 'Unknown',
       order.status,
-      order.total.toString(),
-      order.items.length.toString(),
-      new Date(order.createdAt).toLocaleDateString(),
-      order.shippingAddress
+      (order.total_amount || order.total || 0).toString(),
+      (order.items?.length || 0).toString(),
+      new Date(order.created_at || order.createdAt).toLocaleDateString(),
+      order.shipping_address_line_1 || order.shippingAddress || 'N/A'
     ]);
 
     const csvContent = [headers, ...rows]

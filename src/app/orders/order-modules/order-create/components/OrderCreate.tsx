@@ -15,19 +15,24 @@ interface OrderCreateProps {
 }
 
 interface OrderItem {
-  productId: string;
+  product_id: string;
   quantity: number;
+  unit_price: number;
 }
 
 export const OrderCreate: React.FC<OrderCreateProps> = ({ onOrderCreated }) => {
   const [loading, setLoading] = useState(false);
-  const [customerId, setCustomerId] = useState('');
-  const [items, setItems] = useState<OrderItem[]>([{ productId: '', quantity: 1 }]);
-  const [shippingAddress, setShippingAddress] = useState('');
+  const [items, setItems] = useState<OrderItem[]>([{ product_id: '', quantity: 1, unit_price: 10.00 }]);
+  const [shippingName, setShippingName] = useState('');
+  const [shippingAddressLine1, setShippingAddressLine1] = useState('');
+  const [shippingCity, setShippingCity] = useState('');
+  const [shippingState, setShippingState] = useState('');
+  const [shippingPostalCode, setShippingPostalCode] = useState('');
+  const [shippingCountry, setShippingCountry] = useState('USA');
   const [notes, setNotes] = useState('');
 
   const addItem = () => {
-    setItems([...items, { productId: '', quantity: 1 }]);
+    setItems([...items, { product_id: '', quantity: 1, unit_price: 10.00 }]);
   };
 
   const removeItem = (index: number) => {
@@ -42,18 +47,16 @@ export const OrderCreate: React.FC<OrderCreateProps> = ({ onOrderCreated }) => {
     setItems(updatedItems);
   };
 
-  // Remove this function since we're using a simple string for shipping address
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!customerId || items.some(item => !item.productId || item.quantity <= 0)) {
-      alert('Please fill in all required fields');
+    if (items.some(item => !item.product_id || item.quantity <= 0)) {
+      alert('Please fill in all required product information');
       return;
     }
 
-    if (!shippingAddress) {
-      alert('Please fill in shipping address');
+    if (!shippingName || !shippingAddressLine1 || !shippingCity || !shippingState || !shippingPostalCode) {
+      alert('Please fill in all shipping address fields');
       return;
     }
 
@@ -61,9 +64,18 @@ export const OrderCreate: React.FC<OrderCreateProps> = ({ onOrderCreated }) => {
 
     try {
       const orderData: CreateOrderRequest = {
-        customerId: customerId,
-        items: items.filter(item => item.productId && item.quantity > 0),
-        shippingAddress: shippingAddress
+        customer_id: `guest_${Date.now()}`, // Generate a guest customer ID
+        items: items.filter(item => item.product_id && item.quantity > 0),
+        shipping_address: {
+          name: shippingName,
+          address_line_1: shippingAddressLine1,
+          city: shippingCity,
+          state: shippingState,
+          postal_code: shippingPostalCode,
+          country: shippingCountry
+        },
+        payment_method: 'credit_card',
+        notes: notes || undefined
       };
 
       const response = await fetch('/api/orders', {
@@ -79,9 +91,13 @@ export const OrderCreate: React.FC<OrderCreateProps> = ({ onOrderCreated }) => {
       if (result.success) {
         alert('Order created successfully!');
         // Reset form
-        setCustomerId('');
-        setItems([{ productId: '', quantity: 1 }]);
-        setShippingAddress('');
+        setItems([{ product_id: '', quantity: 1, unit_price: 10.00 }]);
+        setShippingName('');
+        setShippingAddressLine1('');
+        setShippingCity('');
+        setShippingState('');
+        setShippingPostalCode('');
+        setShippingCountry('USA');
         setNotes('');
         onOrderCreated?.();
       } else {
@@ -106,16 +122,11 @@ export const OrderCreate: React.FC<OrderCreateProps> = ({ onOrderCreated }) => {
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-6">
-            {/* Customer Selection */}
-            <div className="space-y-2">
-              <Label htmlFor="customer">Customer *</Label>
-              <Input
-                id="customer"
-                placeholder="Customer ID (temporary - will be replaced with customer selector)"
-                value={customerId}
-                onChange={(e) => setCustomerId(e.target.value)}
-                required
-              />
+            {/* Guest Order Notice */}
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+              <p className="text-sm text-blue-800">
+                <strong>Guest Order:</strong> This order will be created as a guest order using the shipping information provided.
+              </p>
             </div>
 
             {/* Order Items */}
@@ -135,8 +146,8 @@ export const OrderCreate: React.FC<OrderCreateProps> = ({ onOrderCreated }) => {
                       <Label>Product ID</Label>
                       <Input
                         placeholder="Product ID"
-                        value={item.productId}
-                        onChange={(e) => updateItem(index, 'productId', e.target.value)}
+                        value={item.product_id}
+                        onChange={(e) => updateItem(index, 'product_id', e.target.value)}
                         required
                       />
                     </div>
@@ -180,14 +191,65 @@ export const OrderCreate: React.FC<OrderCreateProps> = ({ onOrderCreated }) => {
             {/* Shipping Address */}
             <div className="space-y-4">
               <Label className="text-lg font-medium">Shipping Address *</Label>
-              <div className="space-y-2">
-                <Textarea
-                  placeholder="Enter complete shipping address"
-                  value={shippingAddress}
-                  onChange={(e) => setShippingAddress(e.target.value)}
-                  required
-                  rows={4}
-                />
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Full Name</Label>
+                  <Input
+                    placeholder="Recipient's full name"
+                    value={shippingName}
+                    onChange={(e) => setShippingName(e.target.value)}
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Address Line 1</Label>
+                  <Input
+                    placeholder="Street address"
+                    value={shippingAddressLine1}
+                    onChange={(e) => setShippingAddressLine1(e.target.value)}
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>City</Label>
+                  <Input
+                    placeholder="City"
+                    value={shippingCity}
+                    onChange={(e) => setShippingCity(e.target.value)}
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>State</Label>
+                  <Input
+                    placeholder="State"
+                    value={shippingState}
+                    onChange={(e) => setShippingState(e.target.value)}
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Postal Code</Label>
+                  <Input
+                    placeholder="ZIP/Postal code"
+                    value={shippingPostalCode}
+                    onChange={(e) => setShippingPostalCode(e.target.value)}
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Country</Label>
+                  <Select value={shippingCountry} onValueChange={setShippingCountry}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="USA">United States</SelectItem>
+                      <SelectItem value="Canada">Canada</SelectItem>
+                      <SelectItem value="Mexico">Mexico</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
             </div>
 
