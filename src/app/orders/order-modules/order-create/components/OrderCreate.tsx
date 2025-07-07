@@ -92,9 +92,16 @@ useEffect(() => {
   // Handle product selection and auto-fill price
   const handleProductSelect = (index: number, productId: string) => {
     const selectedProduct = products.find(p => p.id === productId);
+    console.log('Selected product:', selectedProduct);
     if (selectedProduct) {
-      updateItem(index, 'product_id', productId);
-      updateItem(index, 'unit_price', selectedProduct.price || 0);
+      const updatedItems = [...items];
+      updatedItems[index] = {
+        ...updatedItems[index],
+        product_id: productId,
+        unit_price: selectedProduct.price || 0
+      };
+      console.log('Updated item:', updatedItems[index]);
+      setItems(updatedItems);
     }
   };
 
@@ -237,7 +244,7 @@ useEffect(() => {
                         type="number"
                         step="0.01"
                         placeholder="0.00"
-                        value={item.unit_price}
+                        value={item.unit_price || 0}
                         onChange={(e) => updateItem(index, 'unit_price', parseFloat(e.target.value) || 0)}
                         required
                       />
