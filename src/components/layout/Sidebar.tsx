@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { ThemeToggle } from '@/components/theme-toggle';
 import {
   Sidebar,
   SidebarContent,
@@ -136,6 +137,9 @@ export function SidebarLayout({ children }: SidebarLayoutProps) {
                 3
               </Badge>
             </Button>
+            
+            {/* Theme Toggle */}
+            <ThemeToggle />
             
             {/* User Profile */}
             <Button variant="ghost" size="sm">
