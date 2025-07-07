@@ -9,6 +9,8 @@ const nextConfig: NextConfig = {
     // Temporarily ignore TypeScript errors during builds for deployment
     ignoreBuildErrors: true,
   },
+  // Allow the server to be accessed from any host
+  serverExternalPackages: [],
 };
 
 export default nextConfig;
