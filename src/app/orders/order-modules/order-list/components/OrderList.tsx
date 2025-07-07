@@ -27,7 +27,6 @@ import {
   Download, 
   RefreshCw,
   Grid,
-  List,
   Table,
   ChevronLeft,
   ChevronRight,
@@ -67,7 +66,7 @@ export const OrderList: React.FC<OrderListProps> = ({
   } = useOrders();
 
   const [showFilters, setShowFilters] = useState(false);
-  const [viewMode, setViewMode] = useState<'grid' | 'list' | 'table'>('grid');
+  const [viewMode, setViewMode] = useState<'grid' | 'table'>('grid');
   const [searchTerm, setSearchTerm] = useState('');
 
   const handleSearch = () => {
@@ -160,17 +159,9 @@ export const OrderList: React.FC<OrderListProps> = ({
                   variant={viewMode === 'grid' ? 'default' : 'ghost'}
                   size="sm"
                   onClick={() => setViewMode('grid')}
-                  className="rounded-r-none border-r"
+                  className="rounded-r-none"
                 >
                   <Grid className="h-4 w-4" />
-                </Button>
-                <Button
-                  variant={viewMode === 'list' ? 'default' : 'ghost'}
-                  size="sm"
-                  onClick={() => setViewMode('list')}
-                  className="rounded-none border-r"
-                >
-                  <List className="h-4 w-4" />
                 </Button>
                 <Button
                   variant={viewMode === 'table' ? 'default' : 'ghost'}
@@ -250,7 +241,7 @@ export const OrderList: React.FC<OrderListProps> = ({
         {/* Orders List */}
         <div className={showFilters ? 'lg:col-span-3' : 'lg:col-span-4'}>
           {loading ? (
-            <div className={`grid gap-4 ${viewMode === 'grid' ? 'md:grid-cols-2 xl:grid-cols-3' : 'grid-cols-1'}`}>
+            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
               {Array.from({ length: 6 }).map((_, i) => (
                 <Card key={i}>
                   <CardHeader>
@@ -362,7 +353,7 @@ export const OrderList: React.FC<OrderListProps> = ({
                   </CardContent>
                 </Card>
               ) : (
-                <div className={`grid gap-4 ${viewMode === 'grid' ? 'md:grid-cols-2 xl:grid-cols-3' : 'grid-cols-1'}`}>
+                <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
                   {orders.map((order) => (
                     <OrderCard
                       key={order.id}
