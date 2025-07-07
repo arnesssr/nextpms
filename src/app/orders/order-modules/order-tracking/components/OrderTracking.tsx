@@ -34,8 +34,8 @@ export const OrderTracking: React.FC = () => {
   };
 
   const filteredOrders = orders.filter(order =>
-    order.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    order.customerId?.toLowerCase().includes(searchTerm.toLowerCase())
+    (order.id || order.order_number || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (order.customerId || order.customer_id || order.shipping_name || '').toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   const getStatusColor = (status: string) => {
@@ -117,14 +117,14 @@ export const OrderTracking: React.FC = () => {
                   <div className="flex items-center space-x-3">
                     <div className="flex items-center space-x-2">
                       {getStatusIcon(order.status)}
-                      <h3 className="font-semibold">#{order.id}</h3>
+                      <h3 className="font-semibold">#{order.order_number || order.id}</h3>
                     </div>
                     <Badge className={getStatusColor(order.status)}>
                       {order.status}
                     </Badge>
                   </div>
                   <div className="text-sm text-muted-foreground">
-                    ${order.total.toFixed(2)}
+                    ${(order.total || order.total_amount || 0).toFixed(2)}
                   </div>
                 </div>
               </CardHeader>
@@ -135,13 +135,16 @@ export const OrderTracking: React.FC = () => {
                   <div>
                     <h4 className="font-medium mb-2">Customer</h4>
                     <p className="text-sm text-muted-foreground">
-                      Customer: {order.customerId}
+                      Customer: {order.shipping_name || order.customerId || order.customer_id || 'Unknown'}
                     </p>
                   </div>
                   <div>
                     <h4 className="font-medium mb-2">Shipping Address</h4>
                     <div className="text-sm text-muted-foreground">
-                      <p>{order.shippingAddress}</p>
+                      <p>{order.shipping_address_line_1 || order.shippingAddress || 'No address provided'}</p>
+                      {order.shipping_city && (
+                        <p>{order.shipping_city}, {order.shipping_state} {order.shipping_postal_code}</p>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -153,7 +156,7 @@ export const OrderTracking: React.FC = () => {
                       <div>
                         <h4 className="font-medium">Tracking Number</h4>
                         <p className="text-lg font-mono text-blue-600">
-                          TRK{order.id.slice(-8).toUpperCase()}
+                          {order.tracking_number || `TRK${(order.id || order.order_number || '').slice(-8).toUpperCase()}`}
                         </p>
                       </div>
                       <Button variant="outline" size="sm">
@@ -172,7 +175,7 @@ export const OrderTracking: React.FC = () => {
                       <div className="flex-1">
                         <p className="text-sm font-medium">Order Created</p>
                         <p className="text-xs text-muted-foreground">
-                          {formatDate(order.createdAt)}
+                          {formatDate(order.created_at || order.createdAt || new Date().toISOString())}
                         </p>
                       </div>
                     </div>
@@ -183,7 +186,7 @@ export const OrderTracking: React.FC = () => {
                         <div className="flex-1">
                           <p className="text-sm font-medium">Order Shipped</p>
                           <p className="text-xs text-muted-foreground">
-                            {formatDate(order.updatedAt)}
+                            {formatDate(order.shipped_at || order.updated_at || order.updatedAt || new Date().toISOString())}
                           </p>
                         </div>
                       </div>
@@ -195,7 +198,7 @@ export const OrderTracking: React.FC = () => {
                         <div className="flex-1">
                           <p className="text-sm font-medium">Order Delivered</p>
                           <p className="text-xs text-muted-foreground">
-                            {formatDate(order.updatedAt)}
+                            {formatDate(order.delivered_at || order.updated_at || order.updatedAt || new Date().toISOString())}
                           </p>
                         </div>
                       </div>
