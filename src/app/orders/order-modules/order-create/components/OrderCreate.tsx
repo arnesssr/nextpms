@@ -33,12 +33,12 @@ export const OrderCreate: React.FC<OrderCreateProps> = ({ onOrderCreated }) => {
 
   const [products, setProducts] = useState<any[]>([]);
 
-  useEffect(() => {
+useEffect(() => {
     fetchProducts();
   }, []);
 
   // Fetch products from API
-  const fetchProducts = async () => {
+  const fetchProducts = async () => {
     try {
       const response = await fetch('/api/products');
       const result = await response.json();
@@ -51,7 +51,7 @@ export const OrderCreate: React.FC<OrderCreateProps> = ({ onOrderCreated }) => {
     }
   };
 
-  const addItem = () => {
+  const addItem = () => {
     setItems([...items, { product_id: '', quantity: 1, unit_price: 0.00 }]);
   };
 
