@@ -12,7 +12,8 @@ import {
   Settings as SettingsIcon,
   Database,
   Building2,
-  Receipt
+  Receipt,
+  Palette
 } from 'lucide-react';
 
 import ProfileSettingsPage from '../settings-modules/profile-settings/page';
@@ -22,6 +23,7 @@ import CompanySettingsPage from '../settings-modules/company-settings/page';
 import InvoiceSettingsPage from '../settings-modules/invoice-settings/page';
 import IntegrationSettingsPage from '../settings-modules/integration-settings/page';
 import SystemSettingsPage from '../settings-modules/system-settings/page';
+import AppearanceSettingsPage from '../settings-modules/appearance-settings/page';
 
 export default function SettingsTabs() {
   const [activeTab, setActiveTab] = useState('profile');
@@ -69,6 +71,12 @@ export default function SettingsTabs() {
       label: 'Notifications',
       icon: Bell,
       component: NotificationSettingsPage
+    },
+    {
+      value: 'appearance',
+      label: 'Appearance',
+      icon: Palette,
+      component: AppearanceSettingsPage
     },
     {
       value: 'company',
@@ -145,7 +153,7 @@ export default function SettingsTabs() {
       {/* Settings Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-3 sm:space-y-4 md:space-y-6">
         <div className="overflow-x-auto pb-1">
-          <TabsList className="grid w-full grid-cols-4 md:grid-cols-7 min-w-[350px] gap-1 h-auto p-1 sm:min-w-0">
+          <TabsList className="grid w-full grid-cols-4 md:grid-cols-8 min-w-[350px] gap-1 h-auto p-1 sm:min-w-0">
             {settingsTabs.map((tab) => {
               const Icon = tab.icon;
               return (
