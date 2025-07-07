@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -22,7 +22,7 @@ interface OrderItem {
 
 export const OrderCreate: React.FC<OrderCreateProps> = ({ onOrderCreated }) => {
   const [loading, setLoading] = useState(false);
-  const [items, setItems] = useState<OrderItem[]>([{ product_id: '', quantity: 1, unit_price: 10.00 }]);
+  const [items, setItems] = useState<OrderItem[]>([{ product_id: '', quantity: 1, unit_price: 0.00 }]);
   const [shippingName, setShippingName] = useState('');
   const [shippingAddressLine1, setShippingAddressLine1] = useState('');
   const [shippingCity, setShippingCity] = useState('');
@@ -31,8 +31,28 @@ export const OrderCreate: React.FC<OrderCreateProps> = ({ onOrderCreated }) => {
   const [shippingCountry, setShippingCountry] = useState('USA');
   const [notes, setNotes] = useState('');
 
-  const addItem = () => {
-    setItems([...items, { product_id: '', quantity: 1, unit_price: 10.00 }]);
+  const [products, setProducts] = useState<any[]>([]);
+
+  useEffect(() => {
+    fetchProducts();
+  }, []);
+
+  // Fetch products from API
+  const fetchProducts = async () => {
+    try {
+      const response = await fetch('/api/products');
+      const result = await response.json();
+
+      if (result.success) {
+        setProducts(result.data);
+      }
+    } catch (error) {
+      console.error('Error fetching products:', error);
+    }
+  };
+
+  const addItem = () => {
+    setItems([...items, { product_id: '', quantity: 1, unit_price: 0.00 }]);
   };
 
   const removeItem = (index: number) => {
@@ -45,6 +65,15 @@ export const OrderCreate: React.FC<OrderCreateProps> = ({ onOrderCreated }) => {
     const updatedItems = [...items];
     updatedItems[index] = { ...updatedItems[index], [field]: value };
     setItems(updatedItems);
+  };
+
+  // Handle product selection and auto-fill price
+  const handleProductSelect = (index: number, productId: string) => {
+    const selectedProduct = products.find(p => p.id === productId);
+    if (selectedProduct) {
+      updateItem(index, 'product_id', productId);
+      updateItem(index, 'unit_price', selectedProduct.price || 0);
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -91,7 +120,7 @@ export const OrderCreate: React.FC<OrderCreateProps> = ({ onOrderCreated }) => {
       if (result.success) {
         alert('Order created successfully!');
         // Reset form
-        setItems([{ product_id: '', quantity: 1, unit_price: 10.00 }]);
+        setItems([{ product_id: '', quantity: 1, unit_price: 0.00 }]);
         setShippingName('');
         setShippingAddressLine1('');
         setShippingCity('');
@@ -143,13 +172,30 @@ export const OrderCreate: React.FC<OrderCreateProps> = ({ onOrderCreated }) => {
                 <Card key={index} className="p-4">
                   <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
                     <div className="space-y-2">
-                      <Label>Product ID</Label>
-                      <Input
-                        placeholder="Product ID"
+                      <Label>Product *</Label>
+                      <Select
                         value={item.product_id}
-                        onChange={(e) => updateItem(index, 'product_id', e.target.value)}
-                        required
-                      />
+                        onValueChange={(value) => handleProductSelect(index, value)}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select a product" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {products.map((product) => (
+                            <SelectItem key={product.id} value={product.id}>
+                              {product.sku} - {product.name} (${(product.price || 0).toFixed(2)})
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      {item.product_id && (
+                        <div className="text-xs text-muted-foreground">
+                          {(() => {
+                            const selectedProduct = products.find(p => p.id === item.product_id);
+                            return selectedProduct ? `SKU: ${selectedProduct.sku}` : '';
+                          })()} 
+                        </div>
+                      )}
                     </div>
                     
                     <div className="space-y-2">
@@ -164,14 +210,18 @@ export const OrderCreate: React.FC<OrderCreateProps> = ({ onOrderCreated }) => {
                     </div>
                     
                     <div className="space-y-2">
-                      <Label>Unit Price (Auto-calculated)</Label>
+                      <Label>Unit Price ($)</Label>
                       <Input
                         type="number"
                         step="0.01"
-                        placeholder="10.00"
-                        value="10.00"
-                        disabled
+                        placeholder="0.00"
+                        value={item.unit_price}
+                        onChange={(e) => updateItem(index, 'unit_price', parseFloat(e.target.value) || 0)}
+                        required
                       />
+                      <div className="text-xs text-muted-foreground">
+                        Auto-filled from product, can be manually adjusted
+                      </div>
                     </div>
                     
                     <Button
