@@ -39,10 +39,13 @@ import {
 
 import { OrderCard } from './OrderCard';
 import { OrderFilters } from './OrderFilters';
+import { OrderDetailsModal } from './OrderDetailsModal';
+import { OrderEditModal } from './OrderEditModal';
 import { useOrders } from '../hooks';
 import { OrderListService } from '../services';
 import { OrderListProps } from '../types';
 import { OrderFilters as OrderFiltersType } from '@/types';
+import { Order } from '@/types';
 
 export const OrderList: React.FC<OrderListProps> = ({
   onCreateOrder,
@@ -68,6 +71,10 @@ export const OrderList: React.FC<OrderListProps> = ({
   const [showFilters, setShowFilters] = useState(false);
   const [viewMode, setViewMode] = useState<'grid' | 'table'>('grid');
   const [searchTerm, setSearchTerm] = useState('');
+  const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+  const [showOrderDetails, setShowOrderDetails] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [orderToEdit, setOrderToEdit] = useState<Order | null>(null);
 
   const handleSearch = () => {
     applyFilters({ ...filters, search: searchTerm });
@@ -93,16 +100,49 @@ export const OrderList: React.FC<OrderListProps> = ({
   };
 
   const handleEdit = async (order: any) => {
+    setOrderToEdit(order);
+    setShowEditModal(true);
+  };
+
+  const handleSaveEdit = async (orderId: string, updates: any) => {
+    try {
+      await updateOrder(orderId, updates);
+      setShowEditModal(false);
+      setOrderToEdit(null);
+    } catch (error) {
+      console.error('Error updating order:', error);
+      throw error;
+    }
+  };
+
+  const handleCloseEditModal = () => {
+    setShowEditModal(false);
+    setOrderToEdit(null);
+  };
+
+  const handleView = (order: Order) => {
+    setSelectedOrder(order);
+    setShowOrderDetails(true);
+  };
+
+  const handleCloseOrderDetails = () => {
+    setShowOrderDetails(false);
+    setSelectedOrder(null);
+  };
+
+  const handleEditFromModal = (order: Order) => {
     onEditOrder?.(order);
   };
 
-  const handleView = (order: any) => {
-    onViewOrder?.(order);
+  const handleDeleteFromModal = async (orderId: string) => {
+    await handleDelete(orderId);
   };
 
   const handleDelete = async (orderId: string) => {
     try {
+      console.log('OrderList handleDelete called with orderId:', orderId);
       await deleteOrder(orderId);
+      console.log('Delete successful, order list should refresh');
     } catch (error) {
       console.error('Error deleting order:', error);
       alert('Failed to delete order. Please try again.');
@@ -428,6 +468,23 @@ export const OrderList: React.FC<OrderListProps> = ({
           )}
         </div>
       </div>
+      
+      {/* Order Details Modal */}
+      <OrderDetailsModal
+        order={selectedOrder}
+        isOpen={showOrderDetails}
+        onClose={handleCloseOrderDetails}
+        onEdit={handleEditFromModal}
+        onDelete={handleDeleteFromModal}
+      />
+      
+      {/* Order Edit Modal */}
+      <OrderEditModal
+        order={orderToEdit}
+        isOpen={showEditModal}
+        onClose={handleCloseEditModal}
+        onSave={handleSaveEdit}
+      />
     </div>
   );
 };

@@ -183,6 +183,63 @@ export class OrderService {
       // Calculate total
       const totalAmount = subtotal + taxAmount + shippingAmount - discountAmount;
 
+      // Validate products exist and are active
+      const productIds = orderData.items.map(item => item.product_id);
+      const { data: products, error: productError } = await supabase
+        .from('products')
+        .select('id, name, sku, selling_price, stock_quantity, is_active')
+        .in('id', productIds);
+
+      if (productError) {
+        console.error('Error validating products:', productError);
+        return {
+          success: false,
+          message: 'Failed to validate products'
+        };
+      }
+
+      // Check if all products exist and are active
+      const foundProductIds = products?.map(p => p.id) || [];
+      const missingProducts = productIds.filter(id => !foundProductIds.includes(id));
+      
+      if (missingProducts.length > 0) {
+        return {
+          success: false,
+          message: `Products not found: ${missingProducts.join(', ')}`
+        };
+      }
+
+      // Check if products are active and have sufficient stock
+      const productMap = new Map(products?.map(p => [p.id, p]) || []);
+      const validationErrors = [];
+      
+      for (const item of orderData.items) {
+        const product = productMap.get(item.product_id);
+        
+        if (!product?.is_active) {
+          validationErrors.push(`Product ${product?.name || item.product_id} is not available`);
+          continue;
+        }
+        
+        if (product.stock_quantity < item.quantity) {
+          validationErrors.push(`Insufficient stock for ${product.name}. Available: ${product.stock_quantity}, Requested: ${item.quantity}`);
+          continue;
+        }
+        
+        // Validate price isn't too far from the actual product price (allow 10% variance)
+        const priceVariance = Math.abs(item.unit_price - product.selling_price) / product.selling_price;
+        if (priceVariance > 0.1) {
+          validationErrors.push(`Price for ${product.name} is significantly different from current price`);
+        }
+      }
+      
+      if (validationErrors.length > 0) {
+        return {
+          success: false,
+          message: validationErrors.join(', ')
+        };
+      }
+
       // Prepare order data
       const orderInsert = {
         customer_id: orderData.customer_id,
@@ -332,19 +389,42 @@ export class OrderService {
    */
   static async deleteOrder(id: string): Promise<ApiResponse<boolean>> {
     try {
-      const { error } = await supabase
+      // First, check if the order exists
+      const { data: existingOrder, error: checkError } = await supabase
+        .from('orders')
+        .select('id, order_number')
+        .eq('id', id)
+        .single();
+      
+      if (checkError) {
+        console.error('Error checking order existence:', checkError);
+        return {
+          success: false,
+          message: `Order not found: ${checkError.message}`
+        };
+      }
+      
+      if (!existingOrder) {
+        return {
+          success: false,
+          message: 'Order not found'
+        };
+      }
+      
+      // Delete the order (cascade delete will handle related records)
+      const { error: deleteError } = await supabase
         .from('orders')
         .delete()
         .eq('id', id);
 
-      if (error) {
-        console.error('Error deleting order:', error);
+      if (deleteError) {
+        console.error('Error deleting order:', deleteError);
         return {
           success: false,
-          message: error.message
+          message: `Failed to delete order: ${deleteError.message}`
         };
       }
-
+      
       return {
         success: true,
         data: true

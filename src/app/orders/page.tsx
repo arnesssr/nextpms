@@ -31,23 +31,9 @@ export default function OrdersPage() {
   };
 
   const handleDeleteOrder = async (orderId: string) => {
-    if (window.confirm('Are you sure you want to delete this order?')) {
-      try {
-        const response = await fetch(`/api/orders/${orderId}`, {
-          method: 'DELETE',
-        });
-        
-        if (response.ok) {
-          // Refresh the orders list
-          window.location.reload();
-        } else {
-          alert('Failed to delete order');
-        }
-      } catch (error) {
-        console.error('Error deleting order:', error);
-        alert('Failed to delete order');
-      }
-    }
+    // Delete functionality is now handled by the OrderList component
+    // This is just a placeholder for any additional logic needed
+    console.log('Delete order requested for:', orderId);
   };
 
   const handleFulfillOrder = (order: Order) => {

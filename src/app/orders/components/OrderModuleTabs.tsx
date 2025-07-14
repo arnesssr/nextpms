@@ -16,7 +16,6 @@ import { OrderList } from '../order-modules/order-list/components/OrderList';
 import { OrderCreate } from '../order-modules/order-create/components/OrderCreate';
 import { OrderFulfillment } from '../order-modules/order-fulfillment/components/OrderFulfillment';
 import { OrderTracking } from '../order-modules/order-tracking/components/OrderTracking';
-import { OrderAnalytics } from '../order-modules/order-analytics/components/OrderAnalytics';
 import { OrderReturns } from '../order-modules/order-returns/components/OrderReturns';
 import { Order } from '@/types';
 
@@ -52,12 +51,6 @@ const orderModules = [
     label: 'Tracking',
     icon: Truck,
     description: 'Track order shipments'
-  },
-  {
-    id: 'analytics',
-    label: 'Analytics',
-    icon: BarChart3,
-    description: 'Order analytics and reports'
   },
   {
     id: 'returns',
@@ -106,9 +99,6 @@ export const OrderModuleTabs: React.FC<OrderModuleTabsProps> = ({
       case 'tracking':
         return <OrderTracking />;
       
-      case 'analytics':
-        return <OrderAnalytics />;
-      
       case 'returns':
         return <OrderReturns />;
       
@@ -125,7 +115,7 @@ export const OrderModuleTabs: React.FC<OrderModuleTabsProps> = ({
   return (
     <div className="space-y-6">
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-6 lg:w-auto lg:grid-cols-6 gap-1 h-auto p-1">
+        <TabsList className="grid w-full grid-cols-5 lg:w-auto lg:grid-cols-5 gap-1 h-auto p-1">
           {orderModules.map((module) => {
             const IconComponent = module.icon;
             return (

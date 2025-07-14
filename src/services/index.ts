@@ -20,4 +20,4 @@ export { CategoryService, categoryService } from './categories';
 export { ProductService } from './products';
 export { InventoryService } from './inventory';
 export { supplierService, supplierApiService } from './suppliers';
-export { OrderService, OrderAnalyticsService } from './orders';
+export { OrderService } from './orders';

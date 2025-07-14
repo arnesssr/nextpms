@@ -7,8 +7,11 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Plus, Minus, ShoppingCart } from 'lucide-react';
+import { Plus, Minus, ShoppingCart, AlertCircle, Check, X, CheckCircle, Package } from 'lucide-react';
 import { CreateOrderRequest } from '@/types';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import countries from 'world-countries';
 
 interface OrderCreateProps {
   onOrderCreated?: () => void;
@@ -20,6 +23,44 @@ interface OrderItem {
   unit_price: number;
 }
 
+interface ValidationError {
+  field: string;
+  message: string;
+}
+
+interface Product {
+  id: string;
+  name: string;
+  sku: string;
+  selling_price: number;
+  stock_quantity: number;
+  is_active: boolean;
+}
+
+interface Customer {
+  id: string;
+  name: string;
+  email: string;
+  phone?: string;
+}
+
+// Secure guest ID generation
+const generateSecureGuestId = (): string => {
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+    return `guest_${crypto.randomUUID()}`;
+  }
+  
+  // Fallback to more secure random generation
+  const timestamp = Date.now();
+  const randomBytes = new Uint8Array(16);
+  crypto.getRandomValues(randomBytes);
+  const randomString = Array.from(randomBytes, byte => 
+    byte.toString(16).padStart(2, '0')
+  ).join('');
+  
+  return `guest_${timestamp}_${randomString}`;
+};
+
 export const OrderCreate: React.FC<OrderCreateProps> = ({ onOrderCreated }) => {
   const [loading, setLoading] = useState(false);
   const [items, setItems] = useState<OrderItem[]>([{ product_id: '', quantity: 1, unit_price: 0.00 }]);
@@ -28,14 +69,17 @@ export const OrderCreate: React.FC<OrderCreateProps> = ({ onOrderCreated }) => {
   const [shippingCity, setShippingCity] = useState('');
   const [shippingState, setShippingState] = useState('');
   const [shippingPostalCode, setShippingPostalCode] = useState('');
-  const [shippingCountry, setShippingCountry] = useState('USA');
+  const [shippingCountry, setShippingCountry] = useState('US');
   const [notes, setNotes] = useState('');
 
   const [products, setProducts] = useState<any[]>([]);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [createdOrder, setCreatedOrder] = useState<any>(null);
 
 useEffect(() => {
     fetchProducts();
   }, []);
+
 
   // Fetch products from API
   const fetchProducts = async () => {
@@ -53,9 +97,9 @@ useEffect(() => {
         console.error('Failed to fetch products:', result);
         // If no products from API, add some sample products for testing
         const sampleProducts = [
-          { id: 'sample-1', name: 'Sample Product 1', sku: 'SKU-001', price: 10.99 },
-          { id: 'sample-2', name: 'Sample Product 2', sku: 'SKU-002', price: 25.50 },
-          { id: 'sample-3', name: 'Sample Product 3', sku: 'SKU-003', price: 15.75 }
+          { id: 'sample-1', name: 'Sample Product 1', sku: 'SKU-001', selling_price: 10.99 },
+          { id: 'sample-2', name: 'Sample Product 2', sku: 'SKU-002', selling_price: 25.50 },
+          { id: 'sample-3', name: 'Sample Product 3', sku: 'SKU-003', selling_price: 15.75 }
         ];
         console.log('Using sample products:', sampleProducts);
         setProducts(sampleProducts);
@@ -64,9 +108,9 @@ useEffect(() => {
       console.error('Error fetching products:', error);
       // Fallback to sample products on error
       const sampleProducts = [
-        { id: 'sample-1', name: 'Sample Product 1', sku: 'SKU-001', price: 10.99 },
-        { id: 'sample-2', name: 'Sample Product 2', sku: 'SKU-002', price: 25.50 },
-        { id: 'sample-3', name: 'Sample Product 3', sku: 'SKU-003', price: 15.75 }
+        { id: 'sample-1', name: 'Sample Product 1', sku: 'SKU-001', selling_price: 10.99 },
+        { id: 'sample-2', name: 'Sample Product 2', sku: 'SKU-002', selling_price: 25.50 },
+        { id: 'sample-3', name: 'Sample Product 3', sku: 'SKU-003', selling_price: 15.75 }
       ];
       console.log('Using fallback sample products:', sampleProducts);
       setProducts(sampleProducts);
@@ -98,7 +142,7 @@ useEffect(() => {
       updatedItems[index] = {
         ...updatedItems[index],
         product_id: productId,
-        unit_price: selectedProduct.price || 0
+        unit_price: selectedProduct.selling_price || 0
       };
       console.log('Updated item:', updatedItems[index]);
       setItems(updatedItems);
@@ -121,9 +165,11 @@ useEffect(() => {
     setLoading(true);
 
     try {
+      const filteredItems = items.filter(item => item.product_id && item.quantity > 0);
+      
       const orderData: CreateOrderRequest = {
-        customer_id: `guest_${Date.now()}`, // Generate a guest customer ID
-        items: items.filter(item => item.product_id && item.quantity > 0),
+        customer_id: generateSecureGuestId(), // Generate a secure guest customer ID
+        items: filteredItems,
         shipping_address: {
           name: shippingName,
           address_line_1: shippingAddressLine1,
@@ -136,6 +182,9 @@ useEffect(() => {
         notes: notes || undefined
       };
 
+      console.log('Order data being sent:', orderData);
+      console.log('Items to be sent:', filteredItems);
+
       const response = await fetch('/api/orders', {
         method: 'POST',
         headers: {
@@ -145,9 +194,13 @@ useEffect(() => {
       });
 
       const result = await response.json();
+      console.log('Order creation result:', result);
 
       if (result.success) {
-        alert('Order created successfully!');
+        // Store the created order data
+        setCreatedOrder(result.data);
+        setShowSuccessModal(true);
+        
         // Reset form
         setItems([{ product_id: '', quantity: 1, unit_price: 0.00 }]);
         setShippingName('');
@@ -155,11 +208,18 @@ useEffect(() => {
         setShippingCity('');
         setShippingState('');
         setShippingPostalCode('');
-        setShippingCountry('USA');
+        setShippingCountry('US');
         setNotes('');
-        onOrderCreated?.();
       } else {
-        alert(`Failed to create order: ${result.message}`);
+        console.error('Order creation failed:', result);
+        let errorMessage = result.message || 'Unknown error occurred';
+        
+        // If there are validation errors, show them
+        if (result.errors && Array.isArray(result.errors)) {
+          errorMessage = result.errors.join('\n');
+        }
+        
+        alert(`Failed to create order: ${errorMessage}`);
       }
     } catch (error) {
       console.error('Error creating order:', error);
@@ -188,9 +248,9 @@ useEffect(() => {
             </div>
 
             {/* Order Items */}
-            <div className="space-y-4">
+            <div className="space-y-6">
               <div className="flex items-center justify-between">
-                <Label>Order Items *</Label>
+                <Label className="text-lg font-medium">Order Items *</Label>
                 <Button type="button" variant="outline" size="sm" onClick={addItem}>
                   <Plus className="mr-2 h-4 w-4" />
                   Add Item
@@ -199,8 +259,8 @@ useEffect(() => {
               
               {items.map((item, index) => (
                 <Card key={index} className="p-4">
-                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
-                    <div className="space-y-2">
+                  <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 items-start">
+                    <div className="flex flex-col space-y-2">
                       <Label>Product *</Label>
                       <Select
                         value={item.product_id}
@@ -212,13 +272,13 @@ useEffect(() => {
                         <SelectContent>
                           {products.map((product) => (
                             <SelectItem key={product.id} value={product.id}>
-                              {product.sku} - {product.name} (${(product.price || 0).toFixed(2)})
+                              {product.sku} - {product.name} (${(product.selling_price || 0).toFixed(2)})
                             </SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
                       {item.product_id && (
-                        <div className="text-xs text-muted-foreground">
+                        <div className="text-xs text-muted-foreground mt-1">
                           {(() => {
                             const selectedProduct = products.find(p => p.id === item.product_id);
                             return selectedProduct ? `SKU: ${selectedProduct.sku}` : '';
@@ -227,18 +287,31 @@ useEffect(() => {
                       )}
                     </div>
                     
-                    <div className="space-y-2">
+                    <div className="flex flex-col space-y-2">
                       <Label>Quantity</Label>
-                      <Input
-                        type="number"
-                        min="1"
-                        value={item.quantity}
-                        onChange={(e) => updateItem(index, 'quantity', parseInt(e.target.value) || 1)}
-                        required
-                      />
+                      <div className="flex items-center space-x-2">
+                        <Input
+                          type="number"
+                          min="1"
+                          value={item.quantity}
+                          onChange={(e) => updateItem(index, 'quantity', parseInt(e.target.value) || 1)}
+                          required
+                        />
+                        {items.length > 1 && (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => removeItem(index)}
+                            className="h-10 w-10 p-0 flex-shrink-0"
+                          >
+                            <Minus className="h-4 w-4" />
+                          </Button>
+                        )}
+                      </div>
                     </div>
                     
-                    <div className="space-y-2">
+                    <div className="flex flex-col space-y-2">
                       <Label>Unit Price ($)</Label>
                       <Input
                         type="number"
@@ -252,23 +325,13 @@ useEffect(() => {
                         Auto-filled from product, can be manually adjusted
                       </div>
                     </div>
-                    
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={() => removeItem(index)}
-                      disabled={items.length === 1}
-                    >
-                      <Minus className="h-4 w-4" />
-                    </Button>
                   </div>
                 </Card>
               ))}
             </div>
 
             {/* Shipping Address */}
-            <div className="space-y-4">
+            <div className="space-y-6 mt-8">
               <Label className="text-lg font-medium">Shipping Address *</Label>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
@@ -320,12 +383,17 @@ useEffect(() => {
                   <Label>Country</Label>
                   <Select value={shippingCountry} onValueChange={setShippingCountry}>
                     <SelectTrigger>
-                      <SelectValue />
+                      <SelectValue placeholder="Select a country" />
                     </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="USA">United States</SelectItem>
-                      <SelectItem value="Canada">Canada</SelectItem>
-                      <SelectItem value="Mexico">Mexico</SelectItem>
+                    <SelectContent className="max-h-[200px]">
+                      {countries
+                        .sort((a, b) => a.name.common.localeCompare(b.name.common))
+                        .map((country) => (
+                          <SelectItem key={country.cca2} value={country.cca2}>
+                            {country.name.common}
+                          </SelectItem>
+                        ))
+                      }
                     </SelectContent>
                   </Select>
                 </div>
@@ -333,19 +401,20 @@ useEffect(() => {
             </div>
 
             {/* Notes */}
-            <div className="space-y-2">
-              <Label htmlFor="notes">Order Notes (Optional)</Label>
+            <div className="space-y-4 mt-8">
+              <Label htmlFor="notes" className="text-lg font-medium">Order Notes (Optional)</Label>
               <Textarea
                 id="notes"
                 placeholder="Any special instructions or notes for this order..."
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
                 rows={3}
+                className="resize-none"
               />
             </div>
 
             {/* Submit Button */}
-            <div className="flex justify-end space-x-4">
+            <div className="flex justify-end space-x-4 mt-8 pt-6 border-t">
               <Button type="button" variant="outline" onClick={() => onOrderCreated?.()}>
                 Cancel
               </Button>
@@ -356,6 +425,56 @@ useEffect(() => {
           </form>
         </CardContent>
       </Card>
+      
+      {/* Success Modal */}
+      <Dialog open={showSuccessModal} onOpenChange={setShowSuccessModal}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader className="text-center">
+            <div className="mx-auto mb-4 h-16 w-16 rounded-full bg-green-100 flex items-center justify-center">
+              <CheckCircle className="h-8 w-8 text-green-600" />
+            </div>
+            <DialogTitle className="text-xl font-semibold text-gray-900">
+              Order Created Successfully!
+            </DialogTitle>
+            <DialogDescription className="mt-2 text-gray-600">
+              Your order has been processed and is now in the system.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="mt-6 space-y-4">
+            <div className="bg-gray-50 rounded-lg p-4">
+              <div className="flex items-center space-x-2 mb-2">
+                <Package className="h-5 w-5 text-gray-600" />
+                <span className="font-medium text-gray-900">Order Details</span>
+              </div>
+              <div className="space-y-1 text-sm text-gray-600">
+                <div>Order ID: <span className="font-mono font-medium">{createdOrder?.id || 'N/A'}</span></div>
+                <div>Status: <span className="font-medium text-orange-600">Pending</span></div>
+                <div>Total Items: <span className="font-medium">{items.length}</span></div>
+              </div>
+            </div>
+            
+            <div className="flex flex-col sm:flex-row gap-3">
+              <Button 
+                variant="outline" 
+                onClick={() => {
+                  setShowSuccessModal(false);
+                  onOrderCreated?.();
+                }}
+                className="flex-1"
+              >
+                View Orders
+              </Button>
+              <Button 
+                onClick={() => setShowSuccessModal(false)}
+                className="flex-1"
+              >
+                Create Another Order
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

@@ -1,30 +1,70 @@
-import { CreateOrderRequest, OrderItem, ValidationError } from '../types';
+import { CreateOrderRequest } from '@/types/orders';
+
+interface ValidationError {
+  field: string;
+  message: string;
+}
+
+interface OrderItem {
+  product_id: string;
+  quantity: number;
+  unit_price: number;
+}
 
 export class OrderCreateApiService {
   /**
-   * Validate order item
+   * Sanitize string input to prevent XSS attacks
    */
-  static validateOrderItem(item: OrderItem): ValidationError[] {
+  static sanitizeInput(input: string): string {
+    return input
+      .replace(/[<>]/g, '') // Remove potential script tags
+      .replace(/javascript:/gi, '') // Remove javascript: protocol
+      .replace(/on\w+\s*=/gi, '') // Remove event handlers
+      .trim();
+  }
+
+  /**
+   * Validate order item with proper security checks
+   */
+  static validateOrderItem(item: OrderItem, index: number): ValidationError[] {
     const errors: ValidationError[] = [];
 
-    if (!item.productId) {
+    // Validate product_id (must be UUID format for security)
+    if (!item.product_id || typeof item.product_id !== 'string') {
       errors.push({
-        field: 'productId',
-        message: 'Product is required'
+        field: `items[${index}].product_id`,
+        message: 'Product ID is required and must be a valid string'
+      });
+    } else if (!/^[a-zA-Z0-9-_]{1,50}$/.test(item.product_id)) {
+      errors.push({
+        field: `items[${index}].product_id`,
+        message: 'Product ID contains invalid characters'
       });
     }
 
-    if (!item.quantity || item.quantity <= 0) {
+    // Validate quantity (must be positive integer, reasonable limit)
+    if (!item.quantity || !Number.isInteger(item.quantity) || item.quantity <= 0) {
       errors.push({
-        field: 'quantity',
-        message: 'Quantity must be greater than 0'
+        field: `items[${index}].quantity`,
+        message: 'Quantity must be a positive integer'
+      });
+    } else if (item.quantity > 10000) {
+      errors.push({
+        field: `items[${index}].quantity`,
+        message: 'Quantity cannot exceed 10,000 per item'
       });
     }
 
-    if (!item.unitPrice || item.unitPrice <= 0) {
+    // Validate unit_price (must be positive number, reasonable limit)
+    if (!item.unit_price || typeof item.unit_price !== 'number' || item.unit_price <= 0) {
       errors.push({
-        field: 'unitPrice',
-        message: 'Unit price must be greater than 0'
+        field: `items[${index}].unit_price`,
+        message: 'Unit price must be a positive number'
+      });
+    } else if (item.unit_price > 1000000) {
+      errors.push({
+        field: `items[${index}].unit_price`,
+        message: 'Unit price cannot exceed $1,000,000'
       });
     }
 
@@ -32,119 +72,74 @@ export class OrderCreateApiService {
   }
 
   /**
-   * Validate complete order
+   * Validate shipping address with proper security checks
    */
-  static validateOrder(order: CreateOrderRequest): ValidationError[] {
+  static validateShippingAddress(address: any): ValidationError[] {
     const errors: ValidationError[] = [];
 
-    if (!order.customerId) {
+    if (!address || typeof address !== 'object') {
       errors.push({
-        field: 'customerId',
-        message: 'Customer is required'
-      });
-    }
-
-    if (!order.items || order.items.length === 0) {
-      errors.push({
-        field: 'items',
-        message: 'At least one item is required'
-      });
-    }
-
-    if (!order.shippingAddress?.trim()) {
-      errors.push({
-        field: 'shippingAddress',
+        field: 'shipping_address',
         message: 'Shipping address is required'
       });
+      return errors;
     }
 
-    if (!order.paymentMethod) {
-      errors.push({
-        field: 'paymentMethod',
-        message: 'Payment method is required'
-      });
-    }
-
-    // Validate each item
-    order.items?.forEach((item, index) => {
-      const itemErrors = this.validateOrderItem(item);
-      itemErrors.forEach(error => {
+    // Validate required fields
+    const requiredFields = ['name', 'address_line_1', 'city', 'state', 'postal_code', 'country'];
+    
+    requiredFields.forEach(field => {
+      if (!address[field] || typeof address[field] !== 'string' || !address[field].trim()) {
         errors.push({
-          field: `items[${index}].${error.field}`,
-          message: `Item ${index + 1}: ${error.message}`
+          field: `shipping_address.${field}`,
+          message: `${field.replace('_', ' ')} is required`
         });
-      });
+      } else if (address[field].length > 100) {
+        errors.push({
+          field: `shipping_address.${field}`,
+          message: `${field.replace('_', ' ')} cannot exceed 100 characters`
+        });
+      }
     });
+
+    // Validate postal code format
+    if (address.postal_code && !/^[A-Za-z0-9\s-]{3,10}$/.test(address.postal_code)) {
+      errors.push({
+        field: 'shipping_address.postal_code',
+        message: 'Postal code format is invalid'
+      });
+    }
+
+    // Validate country (must be from allowed list)
+    const allowedCountries = ['USA', 'Canada', 'Mexico'];
+    if (address.country && !allowedCountries.includes(address.country)) {
+      errors.push({
+        field: 'shipping_address.country',
+        message: 'Country must be one of: USA, Canada, Mexico'
+      });
+    }
 
     return errors;
   }
 
   /**
-   * Calculate order totals
+   * Generate secure customer ID for guest orders
    */
-  static calculateOrderTotals(items: OrderItem[]) {
-    const subtotal = items.reduce((sum, item) => sum + item.total, 0);
-    const taxRate = 0.08; // 8% tax rate - this should be configurable
-    const tax = subtotal * taxRate;
-    const shipping = subtotal > 100 ? 0 : 10; // Free shipping over $100
-    const total = subtotal + tax + shipping;
-
-    return {
-      subtotal,
-      tax,
-      shipping,
-      total
-    };
-  }
-
-  /**
-   * Format order for API submission
-   */
-  static formatOrderForSubmission(orderData: CreateOrderRequest, items: OrderItem[]) {
-    const totals = this.calculateOrderTotals(items);
-
-    return {
-      customerId: orderData.customerId,
-      items: items.map(item => ({
-        productId: item.productId,
-        quantity: item.quantity,
-        unitPrice: item.unitPrice,
-        total: item.total
-      })),
-      shippingAddress: orderData.shippingAddress,
-      paymentMethod: orderData.paymentMethod,
-      notes: orderData.notes || '',
-      subtotal: totals.subtotal,
-      tax: totals.tax,
-      shipping: totals.shipping,
-      total: totals.total,
-      status: 'pending'
-    };
-  }
-
-  /**
-   * Generate order summary for display
-   */
-  static generateOrderSummary(orderData: CreateOrderRequest, items: OrderItem[]): string {
-    const totals = this.calculateOrderTotals(items);
+  static generateSecureGuestCustomerId(): string {
+    // Use crypto.randomUUID() if available, otherwise use a more secure approach
+    if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+      return `guest_${crypto.randomUUID()}`;
+    }
     
-    const itemsText = items.map((item, index) => 
-      `${index + 1}. ${item.productName} - Qty: ${item.quantity} × $${item.unitPrice.toFixed(2)} = $${item.total.toFixed(2)}`
-    ).join('\n');
-
-    return `
-Order Summary:
-${itemsText}
-
-Subtotal: $${totals.subtotal.toFixed(2)}
-Tax: $${totals.tax.toFixed(2)}
-Shipping: $${totals.shipping.toFixed(2)}
-Total: $${totals.total.toFixed(2)}
-
-Payment Method: ${orderData.paymentMethod}
-Shipping Address: ${orderData.shippingAddress}
-${orderData.notes ? `Notes: ${orderData.notes}` : ''}
-    `.trim();
+    // Fallback to more secure random generation
+    const timestamp = Date.now();
+    const randomBytes = new Uint8Array(16);
+    crypto.getRandomValues(randomBytes);
+    const randomString = Array.from(randomBytes, byte => 
+      byte.toString(16).padStart(2, '0')
+    ).join('');
+    
+    return `guest_${timestamp}_${randomString}`;
   }
 
   /**
@@ -168,55 +163,5 @@ ${orderData.notes ? `Notes: ${orderData.notes}` : ''}
       style: 'currency',
       currency: 'USD'
     }).format(amount);
-  }
-
-  /**
-   * Check product availability
-   */
-  static async checkProductAvailability(productId: string, quantity: number): Promise<{
-    available: boolean;
-    stock: number;
-    message?: string;
-  }> {
-    try {
-      const response = await fetch(`/api/products/${productId}/availability?quantity=${quantity}`);
-      
-      if (!response.ok) {
-        throw new Error('Failed to check product availability');
-      }
-
-      const result = await response.json();
-      return result.data;
-    } catch (error) {
-      console.error('Error checking product availability:', error);
-      return {
-        available: false,
-        stock: 0,
-        message: 'Could not verify product availability'
-      };
-    }
-  }
-
-  /**
-   * Generate order templates for common scenarios
-   */
-  static getOrderTemplates() {
-    return [
-      {
-        name: 'Standard Order',
-        description: 'Regular customer order with standard shipping',
-        paymentMethod: 'credit_card'
-      },
-      {
-        name: 'Bulk Order',
-        description: 'Large quantity order with special handling',
-        paymentMethod: 'bank_transfer'
-      },
-      {
-        name: 'Express Order',
-        description: 'Rush order with expedited shipping',
-        paymentMethod: 'credit_card'
-      }
-    ];
   }
 }

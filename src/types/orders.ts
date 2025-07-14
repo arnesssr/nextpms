@@ -131,24 +131,6 @@ export interface OrderStats {
   revenue_today: number;
 }
 
-export interface OrderAnalytics {
-  period: string;
-  orders_count: number;
-  revenue: number;
-  average_order_value: number;
-  top_products: Array<{
-    product_id: string;
-    product_name: string;
-    quantity_sold: number;
-    revenue: number;
-  }>;
-  orders_by_status: Record<OrderStatus, number>;
-  revenue_by_day: Array<{
-    date: string;
-    revenue: number;
-    orders: number;
-  }>;
-}
 
 export interface ReturnRequest {
   id: string;

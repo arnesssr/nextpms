@@ -90,17 +90,25 @@ export const useOrders = () => {
 
   const deleteOrder = useCallback(async (orderId: string) => {
     try {
+      console.log('Deleting order with ID:', orderId);
       const response = await fetch(`/api/orders/${orderId}`, {
         method: 'DELETE',
       });
+      
+      console.log('Delete response status:', response.status);
+      console.log('Delete response ok:', response.ok);
 
       if (!response.ok) {
-        throw new Error('Failed to delete order');
+        const errorText = await response.text();
+        console.error('Delete failed - response text:', errorText);
+        throw new Error(`Failed to delete order: ${response.status} - ${errorText}`);
       }
 
       const result = await response.json();
+      console.log('Delete result:', result);
       
       if (result.success) {
+        console.log('Order deleted successfully, refreshing list...');
         // Refresh orders list
         await fetchOrders(filters, pagination.page, pagination.limit);
         return true;
@@ -108,6 +116,7 @@ export const useOrders = () => {
         throw new Error(result.message || 'Failed to delete order');
       }
     } catch (err) {
+      console.error('Error in deleteOrder:', err);
       throw err;
     }
   }, [fetchOrders, filters, pagination.page, pagination.limit]);
