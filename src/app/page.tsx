@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { motion, useScroll, useTransform, useInView } from 'framer-motion';
+import dynamic from 'next/dynamic';
 import { 
   Package, 
   TrendingUp, 
@@ -68,32 +69,15 @@ const Card3D = ({ children, className = "", delay = 0 }: { children: React.React
   );
 };
 
-// Floating Elements Component
-const FloatingElements = () => {
-  return (
-    <div className="absolute inset-0 overflow-hidden pointer-events-none">
-      {[...Array(20)].map((_, i) => (
-        <motion.div
-          key={i}
-          className="absolute w-2 h-2 bg-green-400/20 rounded-full"
-          initial={{
-            x: Math.random() * (typeof window !== 'undefined' ? window.innerWidth : 1000),
-            y: Math.random() * (typeof window !== 'undefined' ? window.innerHeight : 1000),
-          }}
-          animate={{
-            x: Math.random() * (typeof window !== 'undefined' ? window.innerWidth : 1000),
-            y: Math.random() * (typeof window !== 'undefined' ? window.innerHeight : 1000),
-          }}
-          transition={{
-            duration: Math.random() * 10 + 10,
-            repeat: Infinity,
-            repeatType: "reverse",
-          }}
-        />
-      ))}
-    </div>
-  );
-};
+// Floating Elements Component (moved to separate file)
+// Dynamic import with SSR disabled to prevent hydration errors
+const DynamicFloatingElements = dynamic(
+  () => import('@/components/landing/FloatingElements').then(mod => mod.FloatingElements),
+  { 
+    ssr: false,
+    loading: () => null
+  }
+);
 
 // Stats Counter Component
 const StatsCounter = ({ end, duration = 2, suffix = "" }: { end: number, duration?: number, suffix?: string }) => {
@@ -161,7 +145,7 @@ export default function LandingPage() {
   return (
     <div className="min-h-screen bg-black text-white overflow-hidden relative">
       <ParticleBackground />
-      <FloatingElements />
+      <DynamicFloatingElements />
       
       {/* Navigation */}
       <motion.nav 

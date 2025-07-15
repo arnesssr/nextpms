@@ -69,7 +69,7 @@ export const OrderCreate: React.FC<OrderCreateProps> = ({ onOrderCreated }) => {
   const [shippingCity, setShippingCity] = useState('');
   const [shippingState, setShippingState] = useState('');
   const [shippingPostalCode, setShippingPostalCode] = useState('');
-  const [shippingCountry, setShippingCountry] = useState('US');
+  const [shippingCountry, setShippingCountry] = useState('USA');
   const [notes, setNotes] = useState('');
 
   const [products, setProducts] = useState<any[]>([]);
@@ -95,25 +95,11 @@ useEffect(() => {
         setProducts(result.data);
       } else {
         console.error('Failed to fetch products:', result);
-        // If no products from API, add some sample products for testing
-        const sampleProducts = [
-          { id: 'sample-1', name: 'Sample Product 1', sku: 'SKU-001', selling_price: 10.99 },
-          { id: 'sample-2', name: 'Sample Product 2', sku: 'SKU-002', selling_price: 25.50 },
-          { id: 'sample-3', name: 'Sample Product 3', sku: 'SKU-003', selling_price: 15.75 }
-        ];
-        console.log('Using sample products:', sampleProducts);
-        setProducts(sampleProducts);
+        setProducts([]);
       }
     } catch (error) {
       console.error('Error fetching products:', error);
-      // Fallback to sample products on error
-      const sampleProducts = [
-        { id: 'sample-1', name: 'Sample Product 1', sku: 'SKU-001', selling_price: 10.99 },
-        { id: 'sample-2', name: 'Sample Product 2', sku: 'SKU-002', selling_price: 25.50 },
-        { id: 'sample-3', name: 'Sample Product 3', sku: 'SKU-003', selling_price: 15.75 }
-      ];
-      console.log('Using fallback sample products:', sampleProducts);
-      setProducts(sampleProducts);
+      setProducts([]);
     }
   };
 
@@ -208,7 +194,7 @@ useEffect(() => {
         setShippingCity('');
         setShippingState('');
         setShippingPostalCode('');
-        setShippingCountry('US');
+        setShippingCountry('USA');
         setNotes('');
       } else {
         console.error('Order creation failed:', result);
@@ -389,8 +375,8 @@ useEffect(() => {
                       {countries
                         .sort((a, b) => a.name.common.localeCompare(b.name.common))
                         .map((country) => (
-                          <SelectItem key={country.cca2} value={country.cca2}>
-                            {country.name.common}
+                          <SelectItem key={country.cca3} value={country.cca3}>
+                            {country.flag} {country.name.common}
                           </SelectItem>
                         ))
                       }

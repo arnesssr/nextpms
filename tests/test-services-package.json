@@ -1,0 +1,17 @@
+{
+  "name": "order-services-test",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "test": "tsx test-order-services.ts",
+    "test:simple": "node test-order-services-simple.js"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.39.0",
+    "dotenv": "^16.0.3"
+  },
+  "devDependencies": {
+    "tsx": "^4.7.0",
+    "@types/node": "^20.0.0"
+  }
+}

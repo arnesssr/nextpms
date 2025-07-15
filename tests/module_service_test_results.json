@@ -1,0 +1,84 @@
+{
+  "timestamp": "2025-07-15T14:26:23.540592",
+  "summary": {
+    "passed": 0,
+    "failed": 8,
+    "skipped": 3,
+    "info": 1,
+    "success_rate": 0.0
+  },
+  "results": [
+    {
+      "name": "Order Create Service",
+      "status": "FAIL",
+      "details": "Status 405: ",
+      "timestamp": "14:26:05"
+    },
+    {
+      "name": "Order List Service - {}",
+      "status": "FAIL",
+      "details": "Status 404: {\"success\":false,\"message\":\"invalid input syntax for type uuid: \\\"order-list\\\"\"}",
+      "timestamp": "14:26:09"
+    },
+    {
+      "name": "Order List Service - {\"status\": \"pending\"}",
+      "status": "FAIL",
+      "details": "Status 404: {\"success\":false,\"message\":\"invalid input syntax for type uuid: \\\"order-list\\\"\"}",
+      "timestamp": "14:26:11"
+    },
+    {
+      "name": "Order List Service - {\"customer_id\": \"test-customer-123\"}",
+      "status": "FAIL",
+      "details": "Status 404: {\"success\":false,\"message\":\"invalid input syntax for type uuid: \\\"order-list\\\"\"}",
+      "timestamp": "14:26:14"
+    },
+    {
+      "name": "Order List Service - {\"date_from\": \"2024-01-01\", \"date_to\": \"2024-12-31\"}",
+      "status": "FAIL",
+      "details": "Status 404: {\"success\":false,\"message\":\"invalid input syntax for type uuid: \\\"order-list\\\"\"}",
+      "timestamp": "14:26:16"
+    },
+    {
+      "name": "Order Fulfillment Service",
+      "status": "SKIP",
+      "details": "No order ID available",
+      "timestamp": "14:26:16"
+    },
+    {
+      "name": "Order Returns Service",
+      "status": "SKIP",
+      "details": "No order ID available",
+      "timestamp": "14:26:17"
+    },
+    {
+      "name": "Order Tracking Service",
+      "status": "SKIP",
+      "details": "No order ID available",
+      "timestamp": "14:26:18"
+    },
+    {
+      "name": "Search Services - Customer Search",
+      "status": "FAIL",
+      "details": "Status 405: ",
+      "timestamp": "14:26:19"
+    },
+    {
+      "name": "Search Services - Product Search",
+      "status": "FAIL",
+      "details": "Status 405: ",
+      "timestamp": "14:26:20"
+    },
+    {
+      "name": "Hook Integration",
+      "status": "INFO",
+      "details": "Testing hook state management simulation",
+      "timestamp": "14:26:20"
+    },
+    {
+      "name": "Hook Integration",
+      "status": "FAIL",
+      "details": "Failed to test hook integration",
+      "timestamp": "14:26:22"
+    }
+  ]
+}

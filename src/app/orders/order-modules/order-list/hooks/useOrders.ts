@@ -59,7 +59,6 @@ export const useOrders = () => {
     }
   }, [filters]);
 
-
   const updateOrder = useCallback(async (orderId: string, updates: any) => {
     try {
       const response = await fetch(`/api/orders/${orderId}`, {

@@ -495,4 +495,208 @@ export class OrderService {
       };
     }
   }
+
+  /**
+   * Validate products for order creation
+   */
+  static async validateProducts(items: Array<{
+    product_id: string;
+    quantity: number;
+  }>): Promise<ApiResponse<Array<{
+    product_id: string;
+    valid: boolean;
+    available: boolean;
+    stock: number;
+    message?: string;
+  }>>> {
+    try {
+      const productIds = items.map(item => item.product_id);
+      
+      const { data: products, error } = await supabase
+        .from('products')
+        .select('id, name, sku, stock_quantity, is_active, selling_price')
+        .in('id', productIds);
+
+      if (error) {
+        console.error('Error validating products:', error);
+        return {
+          success: false,
+          message: error.message
+        };
+      }
+
+      const productMap = new Map(products?.map(p => [p.id, p]) || []);
+      const validationResults = items.map(item => {
+        const product = productMap.get(item.product_id);
+        
+        if (!product) {
+          return {
+            product_id: item.product_id,
+            valid: false,
+            available: false,
+            stock: 0,
+            message: 'Product not found'
+          };
+        }
+
+        if (!product.is_active) {
+          return {
+            product_id: item.product_id,
+            valid: false,
+            available: false,
+            stock: product.stock_quantity,
+            message: 'Product is not active'
+          };
+        }
+
+        if (product.stock_quantity < item.quantity) {
+          return {
+            product_id: item.product_id,
+            valid: false,
+            available: true,
+            stock: product.stock_quantity,
+            message: `Insufficient stock. Available: ${product.stock_quantity}`
+          };
+        }
+
+        return {
+          product_id: item.product_id,
+          valid: true,
+          available: true,
+          stock: product.stock_quantity
+        };
+      });
+
+      const allValid = validationResults.every(r => r.valid);
+
+      return {
+        success: allValid,
+        data: validationResults,
+        message: allValid ? 'All products are valid' : 'Some products are invalid'
+      };
+    } catch (error) {
+      console.error('Error in validateProducts:', error);
+      return {
+        success: false,
+        message: 'Failed to validate products'
+      };
+    }
+  }
+
+  /**
+   * Calculate order totals including tax and shipping
+   */
+  static async calculateTotals(orderData: {
+    items: Array<{
+      product_id: string;
+      quantity: number;
+      unit_price?: number;
+    }>;
+    shipping_address: {
+      city: string;
+      state: string;
+      country: string;
+    };
+    discount_code?: string;
+  }): Promise<ApiResponse<{
+    subtotal: number;
+    tax_amount: number;
+    shipping_amount: number;
+    discount_amount: number;
+    total_amount: number;
+  }>> {
+    try {
+      // Calculate subtotal
+      let subtotal = 0;
+      
+      // If unit prices are not provided, fetch from products
+      if (orderData.items.some(item => !item.unit_price)) {
+        const productIds = orderData.items.map(item => item.product_id);
+        const { data: products } = await supabase
+          .from('products')
+          .select('id, selling_price')
+          .in('id', productIds);
+        
+        const priceMap = new Map(products?.map(p => [p.id, p.selling_price]) || []);
+        
+        subtotal = orderData.items.reduce((sum, item) => {
+          const price = item.unit_price || priceMap.get(item.product_id) || 0;
+          return sum + (price * item.quantity);
+        }, 0);
+      } else {
+        subtotal = orderData.items.reduce((sum, item) => {
+          return sum + ((item.unit_price || 0) * item.quantity);
+        }, 0);
+      }
+
+      // Calculate tax based on state (simplified - in production would use tax API)
+      const taxRates: Record<string, number> = {
+        'CA': 0.0875,  // California
+        'NY': 0.08,    // New York
+        'TX': 0.0625,  // Texas
+        'FL': 0.06,    // Florida
+        // Add more states as needed
+      };
+      const taxRate = taxRates[orderData.shipping_address.state] || 0.08; // Default 8%
+      const taxAmount = subtotal * taxRate;
+
+      // Calculate shipping (free over $100, otherwise based on location)
+      let shippingAmount = 0;
+      if (subtotal < 100) {
+        if (orderData.shipping_address.country !== 'USA') {
+          shippingAmount = 25; // International shipping
+        } else {
+          shippingAmount = 10; // Domestic shipping
+        }
+      }
+
+      // Apply discount if code provided
+      let discountAmount = 0;
+      if (orderData.discount_code) {
+        // In production, validate discount code from database
+        const discountCodes: Record<string, number> = {
+          'WELCOME10': 0.10,  // 10% off
+          'SAVE20': 0.20,     // 20% off
+          'FREESHIP': -1      // Free shipping
+        };
+        
+        const discount = discountCodes[orderData.discount_code.toUpperCase()];
+        if (discount === -1) {
+          discountAmount = shippingAmount; // Free shipping
+        } else if (discount > 0) {
+          discountAmount = subtotal * discount;
+        }
+      }
+
+      // Calculate total
+      const totalAmount = subtotal + taxAmount + shippingAmount - discountAmount;
+
+      return {
+        success: true,
+        data: {
+          subtotal: Math.round(subtotal * 100) / 100,
+          tax_amount: Math.round(taxAmount * 100) / 100,
+          shipping_amount: Math.round(shippingAmount * 100) / 100,
+          discount_amount: Math.round(discountAmount * 100) / 100,
+          total_amount: Math.round(totalAmount * 100) / 100
+        }
+      };
+    } catch (error) {
+      console.error('Error in calculateTotals:', error);
+      return {
+        success: false,
+        message: 'Failed to calculate totals'
+      };
+    }
+  }
+
+  /**
+   * Generate unique order number
+   */
+  static async generateOrderNumber(): Promise<string> {
+    const prefix = 'ORD';
+    const timestamp = Date.now();
+    const random = Math.random().toString(36).substring(2, 7).toUpperCase();
+    return `${prefix}-${timestamp}-${random}`;
+  }
 }

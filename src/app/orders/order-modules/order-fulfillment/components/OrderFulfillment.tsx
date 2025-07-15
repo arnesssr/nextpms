@@ -52,14 +52,18 @@ export const OrderFulfillment: React.FC<OrderFulfillmentProps> = ({ onOrderFulfi
     setFulfilling(true);
 
     try {
-      const response = await fetch(`/api/orders/${selectedOrder.id}`, {
+      const response = await fetch(`/api/orders/${selectedOrder.id}/fulfill`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
           status: 'shipped',
-          tracking_number: trackingNumber
+          shipmentInfo: {
+            carrier: shippingCarrier || 'USPS',
+            trackingNumber: trackingNumber,
+            trackingUrl: `https://tracking.example.com/${trackingNumber}`
+          }
         }),
       });
 

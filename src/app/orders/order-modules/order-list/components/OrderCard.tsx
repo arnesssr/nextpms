@@ -13,7 +13,8 @@ import {
   User,
   Calendar,
   DollarSign,
-  AlertTriangle
+  AlertTriangle,
+  CreditCard
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -81,7 +82,34 @@ export const OrderCard: React.FC<ExtendedOrderCardProps> = ({
     onFulfill?.(order);
   };
 
+  const handleConfirmPayment = async () => {
+    try {
+      const response = await fetch(`/api/orders/${order.id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          status: 'confirmed',
+          payment_status: 'paid'
+        }),
+      });
+
+      const result = await response.json();
+      if (result.success) {
+        // Refresh the order list
+        window.location.reload();
+      } else {
+        alert(`Failed to confirm payment: ${result.message}`);
+      }
+    } catch (error) {
+      console.error('Error confirming payment:', error);
+      alert('Failed to confirm payment. Please try again.');
+    }
+  };
+
   const canFulfill = order.status === 'confirmed' || order.status === 'processing';
+  const isPending = order.status === 'pending';
 
   if (viewMode === 'compact') {
     return (
@@ -156,6 +184,12 @@ export const OrderCard: React.FC<ExtendedOrderCardProps> = ({
                 <Eye className="mr-1 h-3 w-3" />
                 View
               </Button>
+              {isPending && (
+                <Button size="sm" variant="default" onClick={handleConfirmPayment} className="flex-1">
+                  <CreditCard className="mr-1 h-3 w-3" />
+                  Confirm Payment
+                </Button>
+              )}
               {canFulfill && (
                 <Button size="sm" onClick={handleFulfill} className="flex-1">
                   <Package className="mr-1 h-3 w-3" />
@@ -265,6 +299,12 @@ export const OrderCard: React.FC<ExtendedOrderCardProps> = ({
               <Eye className="mr-2 h-4 w-4" />
               View
             </Button>
+            {isPending && (
+              <Button size="sm" variant="default" onClick={handleConfirmPayment} className="flex-1">
+                <CreditCard className="mr-2 h-4 w-4" />
+                Confirm Payment
+              </Button>
+            )}
             {canFulfill && (
               <Button size="sm" onClick={handleFulfill} className="flex-1">
                 <Package className="mr-2 h-4 w-4" />

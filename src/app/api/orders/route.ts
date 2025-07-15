@@ -125,10 +125,10 @@ export async function POST(request: NextRequest) {
         validationErrors.push('Invalid postal code format');
       }
       
-      // Validate country
-      const allowedCountries = ['USA', 'Canada', 'Mexico'];
-      if (!allowedCountries.includes(body.shipping_address.country)) {
-        validationErrors.push('Invalid country');
+      // Validate country - accept any 3-letter ISO country code
+      if (body.shipping_address.country && 
+          !/^[A-Z]{3}$/.test(body.shipping_address.country)) {
+        validationErrors.push('Country must be a valid 3-letter ISO country code');
       }
     }
     
