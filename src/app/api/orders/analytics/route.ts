@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getDatabase } from '@/services/database';
-import { DatabaseError } from '@/types/errors';
+import { supabase } from '@/lib/supabaseClient';
 
 export async function GET(request: NextRequest) {
   try {
@@ -8,7 +7,6 @@ export async function GET(request: NextRequest) {
     const startDate = searchParams.get('startDate');
     const endDate = searchParams.get('endDate');
 
-    const db = await getDatabase();
 
     // Build date filter
     let dateFilter = '';
@@ -23,73 +21,70 @@ export async function GET(request: NextRequest) {
     }
 
     // Get total orders count
-    const totalOrdersResult = await db.get(`
-      SELECT COUNT(*) as total_orders
-      FROM orders
-      WHERE 1=1 ${dateFilter}
-    `, dateParams);
+const totalOrdersResult = await supabase
+      .from('orders')
+      .select('id', { count: 'exact', head: true })
+      .match({ 'created_at': dateFilter })
+      .range(0, 1);
 
     // Get total revenue
-    const totalRevenueResult = await db.get(`
-      SELECT SUM(total_amount) as total_revenue
-      FROM orders
-      WHERE 1=1 ${dateFilter}
-    `, dateParams);
+    const totalRevenueResult = await supabase
+      .from('orders')
+      .select('SUM(total_amount) as total_revenue')
+      .match({ 'created_at': dateFilter });
 
     // Get orders by status
-    const ordersByStatus = await db.all(`
-      SELECT status, COUNT(*) as count
-      FROM orders
-      WHERE 1=1 ${dateFilter}
-      GROUP BY status
-    `, dateParams);
+    const ordersByStatus = await supabase
+      .from('orders')
+      .select('status, COUNT(*) as count')
+      .match({ 'created_at': dateFilter })
+      .group('status');
 
     // Get average order value
-    const avgOrderValueResult = await db.get(`
-      SELECT AVG(total_amount) as avg_order_value
-      FROM orders
-      WHERE 1=1 ${dateFilter}
-    `, dateParams);
+    const avgOrderValueResult = await supabase
+      .from('orders')
+      .select('AVG(total_amount) as avg_order_value')
+      .match({ 'created_at': dateFilter });
 
     // Get top customers
-    const topCustomers = await db.all(`
-      SELECT 
+    const topCustomers = await supabase
+      .from('orders')
+      .select(`
         c.id,
         c.name,
         c.email,
         COUNT(o.id) as order_count,
         SUM(o.total_amount) as total_spent
-      FROM orders o
-      LEFT JOIN customers c ON o.customer_id = c.id
-      WHERE 1=1 ${dateFilter}
-      GROUP BY c.id
-      ORDER BY total_spent DESC
-      LIMIT 5
-    `, dateParams);
+      `)
+      .match({ 'created_at': dateFilter })
+      .join('customers c', { on: 'o.customer_id', to: 'c.id' })
+      .group('c.id')
+      .order('total_spent', { ascending: false })
+      .range(0, 4);
 
     // Get orders trend (daily for last 30 days or specified period)
-    const ordersTrend = await db.all(`
-      SELECT 
+    const ordersTrend = await supabase
+      .from('orders')
+      .select(`
         DATE(created_at) as date,
         COUNT(*) as order_count,
         SUM(total_amount) as daily_revenue
-      FROM orders
-      WHERE 1=1 ${dateFilter}
-      GROUP BY DATE(created_at)
-      ORDER BY date DESC
-      LIMIT 30
-    `, dateParams);
+      `)
+      .match({ 'created_at': dateFilter })
+      .group('DATE(created_at)')
+      .order('date', { ascending: false })
+      .range(0, 29);
 
     // Get revenue by payment method
-    const revenueByPaymentMethod = await db.all(`
-      SELECT 
+    const revenueByPaymentMethod = await supabase
+      .from('orders')
+      .select(`
         payment_method,
         COUNT(*) as count,
         SUM(total_amount) as total
-      FROM orders
-      WHERE 1=1 ${dateFilter}
-      GROUP BY payment_method
-    `, dateParams);
+      `)
+      .match({ 'created_at': dateFilter })
+      .group('payment_method');
 
     return NextResponse.json({
       analytics: {
@@ -117,9 +112,6 @@ export async function GET(request: NextRequest) {
     });
   } catch (error) {
     console.error('Error fetching order analytics:', error);
-    if (error instanceof DatabaseError) {
-      return NextResponse.json({ error: error.message }, { status: 503 });
-    }
     return NextResponse.json({ error: 'Failed to fetch analytics' }, { status: 500 });
   }
 }
