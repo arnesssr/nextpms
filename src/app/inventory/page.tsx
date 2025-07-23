@@ -712,7 +712,7 @@ export default function InventoryPage() {
           onClose={handleModalClose}
           item={selectedItem}
           products={stocks.map(stock => ({
-            id: stock.id,
+            id: stock.productId,  // Use productId instead of stock.id
             name: stock.productName,
             sku: stock.productSku,
             price: stock.costPerUnit || 0,

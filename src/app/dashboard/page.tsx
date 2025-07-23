@@ -1,63 +1,109 @@
 'use client';
 
+import { useState, useEffect } from 'react';
 import { SidebarLayout } from '@/components/layout/Sidebar';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { 
   Package, 
-  ShoppingCart, 
-  TrendingUp, 
+  ShoppingCart,
   AlertCircle,
   DollarSign,
-  Users
+  Loader2
 } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 
 export default function Dashboard() {
-  // Mock data - this will be replaced with real API calls
-  const stats = [
+  const router = useRouter();
+  const [loading, setLoading] = useState(true);
+  const [statsData, setStatsData] = useState<any>(null);
+  const [lowStockData, setLowStockData] = useState<any[]>([]);
+  const [error, setError] = useState<string | null>(null);
+
+  // Fetch dashboard data
+  useEffect(() => {
+    const fetchDashboardData = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        
+        // Fetch stats
+        const statsResponse = await fetch('/api/dashboard/stats');
+        if (!statsResponse.ok) {
+          const errorData = await statsResponse.json();
+          throw new Error(errorData.error || 'Failed to fetch stats');
+        }
+        const stats = await statsResponse.json();
+        
+        // Fetch low stock items
+        const lowStockResponse = await fetch('/api/dashboard/low-stock');
+        if (!lowStockResponse.ok) {
+          const errorData = await lowStockResponse.json();
+          throw new Error(errorData.error || 'Failed to fetch low stock items');
+        }
+        const lowStock = await lowStockResponse.json();
+        
+        setStatsData(stats);
+        setLowStockData(lowStock.items || []);
+      } catch (err) {
+        console.error('Dashboard error:', err);
+        setError(err instanceof Error ? err.message : 'Failed to load dashboard data');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchDashboardData();
+  }, []);
+
+  // Format currency
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD',
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
+    }).format(amount);
+  };
+
+  // Format number
+  const formatNumber = (num: number) => {
+    return new Intl.NumberFormat('en-US').format(num);
+  };
+
+  // Prepare stats for display
+  const stats = statsData ? [
     {
       title: 'Total Products',
-      value: '1,234',
+      value: formatNumber(statsData.totalProducts.value),
       icon: Package,
-      change: '+12%',
-      changeType: 'increase' as const,
+      change: `${statsData.totalProducts.change > 0 ? '+' : ''}${statsData.totalProducts.change}%`,
+      changeType: statsData.totalProducts.changeType,
     },
     {
       title: 'Total Orders',
-      value: '856',
+      value: formatNumber(statsData.totalOrders?.value || 0),
       icon: ShoppingCart,
-      change: '+8%',
-      changeType: 'increase' as const,
+      change: `${(statsData.totalOrders?.change || 0) > 0 ? '+' : ''}${statsData.totalOrders?.change || 0}%`,
+      changeType: statsData.totalOrders?.changeType || 'increase',
     },
     {
-      title: 'Revenue',
-      value: '$45,678',
+      title: 'Inventory Value',
+      value: formatCurrency(statsData.revenue.value),
       icon: DollarSign,
-      change: '+15%',
-      changeType: 'increase' as const,
+      change: `${statsData.revenue.change > 0 ? '+' : ''}${statsData.revenue.change}%`,
+      changeType: statsData.revenue.changeType,
     },
     {
       title: 'Low Stock Items',
-      value: '23',
+      value: formatNumber(statsData.lowStockItems.value),
       icon: AlertCircle,
-      change: '-5%',
-      changeType: 'decrease' as const,
+      change: `${statsData.lowStockItems.change > 0 ? '+' : ''}${statsData.lowStockItems.change}%`,
+      changeType: statsData.lowStockItems.changeType,
     },
-  ];
+  ] : [];
 
-  const recentOrders = [
-    { id: 'ORD-001', customer: 'John Doe', status: 'processing', total: '$124.99' },
-    { id: 'ORD-002', customer: 'Jane Smith', status: 'shipped', total: '$89.50' },
-    { id: 'ORD-003', customer: 'Bob Johnson', status: 'delivered', total: '$234.00' },
-    { id: 'ORD-004', customer: 'Alice Brown', status: 'pending', total: '$156.75' },
-  ];
-
-  const lowStockProducts = [
-    { name: 'Product A', stock: 5, threshold: 10 },
-    { name: 'Product B', stock: 2, threshold: 15 },
-    { name: 'Product C', stock: 8, threshold: 20 },
-  ];
 
   return (
     <SidebarLayout>
@@ -70,63 +116,50 @@ export default function Dashboard() {
           </p>
         </div>
 
-        {/* Stats Grid */}
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-          {stats.map((stat) => {
-            const Icon = stat.icon;
-            return (
-              <Card key={stat.title}>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">
-                    {stat.title}
-                  </CardTitle>
-                  <Icon className="h-4 w-4 text-muted-foreground" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">{stat.value}</div>
-                  <p className="text-xs text-muted-foreground">
-                    <span className={stat.changeType === 'increase' ? 'text-green-600' : 'text-red-600'}>
-                      {stat.change}
-                    </span>
-                    {' '}from last month
-                  </p>
-                </CardContent>
-              </Card>
-            );
-          })}
-        </div>
-
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
-          {/* Recent Orders */}
-          <Card className="col-span-4">
-            <CardHeader>
-              <CardTitle>Recent Orders</CardTitle>
-              <CardDescription>
-                Latest orders from your customers
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {recentOrders.map((order) => (
-                  <div key={order.id} className="flex items-center justify-between">
-                    <div className="space-y-1">
-                      <p className="text-sm font-medium">{order.id}</p>
-                      <p className="text-sm text-muted-foreground">{order.customer}</p>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <Badge variant={order.status === 'delivered' ? 'default' : 'secondary'}>
-                        {order.status}
-                      </Badge>
-                      <span className="text-sm font-medium">{order.total}</span>
-                    </div>
-                  </div>
-                ))}
+        {/* Loading State */}
+        {loading ? (
+          <div className="flex items-center justify-center py-12">
+            <Loader2 className="h-8 w-8 animate-spin text-gray-500" />
+          </div>
+        ) : error ? (
+          <Card className="border-red-200">
+            <CardContent className="pt-6">
+              <div className="text-center text-red-600">
+                <AlertCircle className="h-8 w-8 mx-auto mb-2" />
+                <p>{error}</p>
               </div>
             </CardContent>
           </Card>
+        ) : (
+          <>
+            {/* Stats Grid */}
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+              {stats.map((stat) => {
+                const Icon = stat.icon;
+                return (
+                  <Card key={stat.title}>
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                      <CardTitle className="text-sm font-medium">
+                        {stat.title}
+                      </CardTitle>
+                      <Icon className="h-4 w-4 text-muted-foreground" />
+                    </CardHeader>
+                    <CardContent>
+                      <div className="text-2xl font-bold">{stat.value}</div>
+                      <p className="text-xs text-muted-foreground">
+                        <span className={stat.changeType === 'increase' ? 'text-green-600' : 'text-red-600'}>
+                          {stat.change}
+                        </span>
+                        {' '}from last month
+                      </p>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
 
-          {/* Low Stock Alert */}
-          <Card className="col-span-3">
+        {/* Low Stock Alert */}
+        <Card className="max-w-2xl mx-auto">
             <CardHeader>
               <CardTitle className="flex items-center">
                 <AlertCircle className="mr-2 h-4 w-4 text-amber-500" />
@@ -138,26 +171,39 @@ export default function Dashboard() {
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                {lowStockProducts.map((product) => (
-                  <div key={product.name} className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-medium">{product.name}</p>
-                      <p className="text-xs text-muted-foreground">
-                        Threshold: {product.threshold}
-                      </p>
-                    </div>
-                    <Badge variant="outline" className="text-amber-600">
-                      {product.stock} left
-                    </Badge>
-                  </div>
-                ))}
-                <Button className="w-full mt-4" variant="outline">
-                  View All Low Stock
-                </Button>
+                {lowStockData.length === 0 ? (
+                  <p className="text-sm text-muted-foreground text-center py-4">
+                    All products are well stocked!
+                  </p>
+                ) : (
+                  <>
+                    {lowStockData.map((product) => (
+                      <div key={product.name} className="flex items-center justify-between">
+                        <div>
+                          <p className="text-sm font-medium">{product.name}</p>
+                          <p className="text-xs text-muted-foreground">
+                            SKU: {product.sku}
+                          </p>
+                        </div>
+                        <Badge variant="outline" className="text-amber-600">
+                          {product.current_stock} left
+                        </Badge>
+                      </div>
+                    ))}
+                    <Button 
+                      className="w-full mt-4" 
+                      variant="outline"
+                      onClick={() => router.push('/inventory')}
+                    >
+                      View All Inventory
+                    </Button>
+                  </>
+                )}
               </div>
             </CardContent>
           </Card>
-        </div>
+          </>
+        )}
       </div>
     </SidebarLayout>
   );

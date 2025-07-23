@@ -40,7 +40,7 @@ export class StockService {
     
     return {
       id: apiStock.id,
-      productId: apiStock.product_id || apiStock.productId,
+      productId: apiStock.product_id || apiStock.productId || productData.id,  // Ensure we get the actual product ID
       productName: productData.name || apiStock.productName || 'Unknown Product',
       productSku: productData.sku || apiStock.productSku || 'N/A',
       currentQuantity: currentQty,

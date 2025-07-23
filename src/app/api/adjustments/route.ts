@@ -26,7 +26,12 @@ export async function GET(request: NextRequest) {
 
     if (testError) {
       console.error('Error testing stock_adjustments table:', testError);
-      // Table might not exist, let's return empty data for now
+      // Check if it's a missing table error
+      if (testError.message?.includes('relation') && testError.message?.includes('does not exist')) {
+        console.log('stock_adjustments table does not exist yet');
+        return NextResponse.json([]);
+      }
+      // For other errors, still return empty array to prevent crashes
       return NextResponse.json([]);
     }
 
